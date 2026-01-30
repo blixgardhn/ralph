@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [--tool opencode|amp|claude] [max_iterations]
 
@@ -92,7 +92,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
 
   elif [[ "$TOOL" == "claude" ]]; then
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/prompt.md" 2>&1 | tee /dev/stderr) || true
 
   else
     # OpenCode: run with prompt passed as a single argument
