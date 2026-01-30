@@ -34,4 +34,4 @@ The plan must reflect current repo reality and remain the authoritative executio
 Always use exact tool names in lowercase: read, write, edit, bash, etc. Call 'read' with correct filePath BEFORE any edit or write. Output ONLY the structured tool call block when using tools—no extra text before or after.
 Be extremely precise with tool calls. Use this format exactly: <tool_call name="read"><arg_key>filePath</arg_key><arg_value>path/to/file</arg_value></tool_call>
 
-ralph/context/RULES are authoritative constraints. If they conflict with other instructions, Ralph must resolve the conflict explicitly (PLAN or SPEC GAP), never silently.
+ralph/context/RULES-dotnet.md and ralph/context/RULES-python.md are authoritative constraints. Apply the relevant language rules; if they conflict with other instructions, Ralph must resolve the conflict explicitly (PLAN or SPEC GAP), never silently.

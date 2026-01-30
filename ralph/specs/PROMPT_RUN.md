@@ -11,7 +11,7 @@ Regardless of whether you choose PLAN or BUILD, you are running under the OpenCo
 - Do not place application code outside `src/`.
 
 Inputs available in the provided context:
-- GOAL, RULES
+- GOAL, RULES-dotnet, RULES-python
 - prd.json
 - current IMPLEMENTATION_PLAN.md (if exists)
 - progress.md (if exists)
@@ -43,7 +43,7 @@ Hard invariants:
 - IMPLEMENTATION_PLAN.md must be updated every run.
 - ralph/context/state.json must be updated every run.
 - If PRD requires browser verification, you must write manual verification steps in progress.md and you must not claim completion without human confirmation.
-- ralph/context/RULES are authoritative constraints; if conflict exists, resolve explicitly (PLAN + SPEC GAP), never silently.
+- ralph/context/RULES-dotnet.md and ralph/context/RULES-python.md are authoritative constraints; apply the relevant language rules. If conflict exists, resolve explicitly (PLAN + SPEC GAP), never silently.
 - Do not introduce secrets or real credentials.
 - If there is no SPEC GAP between PRD and code, exit the loop and do no more work
 
@@ -81,6 +81,6 @@ Hard invariants:
 - Repository state is the source of truth:
   - IMPLEMENTATION_PLAN.md (current executable plan)
   - progress.md (append-only narrative log)
-  - GOAL.md and RULES.md (intent + constraints)
+- GOAL.md and RULES-*.md (intent + constraints)
 
 

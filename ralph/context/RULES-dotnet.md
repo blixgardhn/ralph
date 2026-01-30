@@ -1,4 +1,4 @@
-# Rules
+# Rules (dotnet)
 
 ## Language
 - Code, comments, commit messages, and documentation must be in English.
