@@ -22,12 +22,12 @@ Copy the minimal Ralph runner files into another repository so `ralph.sh` can ru
 
 ## Files to Copy (Default)
 
-- `ralph.sh`
-- `prompt.md`
-- `AGENTS.md`
-- `prd.json.example`
-- `ralph/context/`
-- `ralph/specs/`
+- `../ralph/ralph.sh`
+- `../ralph/prompt.md`
+- `../ralph/AGENTS.md`
+- `../ralph/prd.json.example`
+- `../ralph/ralph/context/`
+- `../ralph/ralph/specs/`
 
 If the user asks for additional items, include them (for example `prd.json.example`, `README.md`, or `ralph.webp`).
 
@@ -45,11 +45,12 @@ If the user asks for additional items, include them (for example `prd.json.examp
 
 ```
 I can copy these into /path/to/target:
-- ralph.sh
-- prompt.md
-- AGENTS.md
-- ralph/context/
-- ralph/specs/
+- ../ralph/ralph.sh
+- ../ralph/prompt.md
+- ../ralph/AGENTS.md
+- ../ralph/prd.json.example
+- ../ralph/ralph/context/
+- ../ralph/ralph/specs/
 
 This may overwrite existing files. Proceed? (yes/no)
 ```
