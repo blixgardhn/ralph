@@ -39,3 +39,11 @@
 - Use the standard `logging` module for application logs; avoid `print` in production code.
 - Follow repository formatting/linting standards (e.g., ruff, black); do not disable rules broadly.
 - Avoid blocking calls inside async code paths; use `asyncio`-compatible libraries when needed.
+
+## Preferred application frameworks
+- Web apps and REST backends: prefer Django unless clearly overkill, then use FastAPI; always defer to the repository's existing framework.
+  - Clearly overkill examples: a small service with only a few endpoints, no admin site, no relational ORM needs, or a lightweight CRUD API without complex auth or model relationships.
+- App frontends (Python-based): any Python framework is acceptable; prefer the repository's existing choice.
+- Web frontend (if needed): prefer Vue.js.
+- CLIs: prefer Typer for modern CLI apps; use Click only when already established.
+- Background jobs: prefer APScheduler for lightweight scheduling; use Celery only when distributed execution is required.
