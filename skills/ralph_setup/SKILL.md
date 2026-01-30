@@ -13,23 +13,40 @@ Copy the minimal Ralph runner files into another repository so `ralph.sh` can ru
 ## The Job
 
 1. Ask for the target workspace path (absolute path)
-2. Show the exact files/folders that will be copied
-3. Ask for explicit confirmation BEFORE copying
-4. Copy files into the target workspace
-5. Report what was added/overwritten
+2. Resolve the Ralph source path
+3. Show the exact files/folders that will be copied
+4. Ask for explicit confirmation BEFORE copying
+5. Copy files into the target workspace
+6. Report what was added/overwritten
 
 ---
 
 ## Files to Copy (Default)
 
-- `../ralph/ralph.sh`
-- `../ralph/prompt.md`
-- `../ralph/AGENTS.md`
-- `../ralph/prd.json.example`
-- `../ralph/ralph/context/`
-- `../ralph/ralph/specs/`
+Use repo-root relative paths. Resolve the source repo first, then join these paths:
+
+- `ralph.sh`
+- `prompt.md`
+- `AGENTS.md`
+- `prd.json.example`
+- `ralph/context/`
+- `ralph/specs/`
 
 If the user asks for additional items, include them (for example `prd.json.example`, `README.md`, or `ralph.webp`).
+
+---
+
+## Source Repo Resolution
+
+- If `RALPH_SOURCE_DIR` is set, use it as the source repo root.
+- Else, if `ralph.sh` exists at the current repo root, use the current repo.
+- Else, ask the user for the Ralph repo absolute path.
+
+Example env var setup:
+
+```bash
+export RALPH_SOURCE_DIR=/path/to/ralph
+```
 
 ---
 
@@ -45,12 +62,12 @@ If the user asks for additional items, include them (for example `prd.json.examp
 
 ```
 I can copy these into /path/to/target:
-- ../ralph/ralph.sh
-- ../ralph/prompt.md
-- ../ralph/AGENTS.md
-- ../ralph/prd.json.example
-- ../ralph/ralph/context/
-- ../ralph/ralph/specs/
+- ralph.sh
+- prompt.md
+- AGENTS.md
+- prd.json.example
+- ralph/context/
+- ralph/specs/
 
 This may overwrite existing files. Proceed? (yes/no)
 ```
