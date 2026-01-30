@@ -1,11 +1,11 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [--tool amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|amp|claude] [max_iterations]
 
 set -e
 
 # Parse arguments
-TOOL="amp"  # Default to amp for backwards compatibility
+TOOL="opencode"  # Default to opencode for backwards compatibility
 MAX_ITERATIONS=10
 
 while [[ $# -gt 0 ]]; do
