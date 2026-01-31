@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.txt`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.md`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -109,7 +109,7 @@ Ralph will:
 4. Run quality checks inside containers (typecheck, tests; no host toolchains)
 5. Commit if checks pass
 6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
+7. Append learnings to `progress.md`
 8. Repeat until all stories pass or max iterations reached
 
 ## Key Files
@@ -120,7 +120,7 @@ Ralph will:
 | `prompt.md` | Prompt template for the AI tool |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
+| `progress.md` | Append-only learnings for future iterations |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph_prd/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 
@@ -130,7 +130,7 @@ Ralph will:
 
 Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
-- `progress.txt` (learnings and context)
+- `progress.md` (learnings and context)
 - `prd.json` (which stories are done)
 
 ### Small Tasks
@@ -181,7 +181,7 @@ Check current state:
 cat prd.json | jq '.userStories[] | {id, title, passes}'
 
 # See learnings from previous iterations
-cat progress.txt
+cat progress.md
 
 # Check git history
 git log --oneline -10
