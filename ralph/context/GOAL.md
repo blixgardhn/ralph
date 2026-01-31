@@ -13,4 +13,4 @@
 - 
 
 ## Constraints
-- 
+- All development, dependency installation, linting, testing, building, and database seeding must run inside containers (Docker/Podman/Compose); keep the host environment untouched

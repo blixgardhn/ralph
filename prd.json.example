@@ -2,6 +2,9 @@
   "project": "MyApp",
   "branchName": "ralph/task-priority",
   "description": "Task Priority System - Add priority levels to tasks",
+  "constraints": [
+    "All dependency installation, linting, testing, builds, and database seeding must run inside containers (Docker/Podman/Compose); do not install toolchains on the host"
+  ],
   "userStories": [
     {
       "id": "US-001",
@@ -10,7 +13,7 @@
       "acceptanceCriteria": [
         "Add priority column to tasks table: 'high' | 'medium' | 'low' (default 'medium')",
         "Generate and run migration successfully",
-        "Typecheck passes"
+        "Typecheck passes via containerized tooling only"
       ],
       "priority": 1,
       "passes": false,
@@ -23,7 +26,7 @@
       "acceptanceCriteria": [
         "Each task card shows colored priority badge (red=high, yellow=medium, gray=low)",
         "Priority visible without hovering or clicking",
-        "Typecheck passes",
+        "Typecheck passes via containerized tooling only",
         "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
@@ -38,7 +41,7 @@
         "Priority dropdown in task edit modal",
         "Shows current priority as selected",
         "Saves immediately on selection change",
-        "Typecheck passes",
+        "Typecheck passes via containerized tooling only",
         "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
@@ -53,7 +56,7 @@
         "Filter dropdown with options: All | High | Medium | Low",
         "Filter persists in URL params",
         "Empty state message when no tasks match filter",
-        "Typecheck passes",
+        "Typecheck passes via containerized tooling only",
         "Verify in browser using dev-browser skill"
       ],
       "priority": 4,

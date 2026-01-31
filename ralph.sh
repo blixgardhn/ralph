@@ -58,9 +58,14 @@ if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
     echo "   Archived to: $ARCHIVE_FOLDER"
     
     # Reset progress file for new run
-    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
-    echo "Started: $(date)" >> "$PROGRESS_FILE"
-    echo "---" >> "$PROGRESS_FILE"
+    {
+      echo "## Codebase Patterns"
+      echo "- Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); keep the host free of project toolchains"
+      echo ""
+      echo "# Ralph Progress Log"
+      echo "Started: $(date)"
+      echo "---"
+    } > "$PROGRESS_FILE"
   fi
 fi
 
@@ -74,9 +79,14 @@ fi
 
 # Initialize progress file if it doesn't exist
 if [ ! -f "$PROGRESS_FILE" ]; then
-  echo "# Ralph Progress Log" > "$PROGRESS_FILE"
-  echo "Started: $(date)" >> "$PROGRESS_FILE"
-  echo "---" >> "$PROGRESS_FILE"
+  {
+    echo "## Codebase Patterns"
+    echo "- Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); keep the host free of project toolchains"
+    echo ""
+    echo "# Ralph Progress Log"
+    echo "Started: $(date)"
+    echo "---"
+  } > "$PROGRESS_FILE"
 fi
 
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"

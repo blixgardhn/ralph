@@ -21,6 +21,7 @@ Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Co
 - `prd.json.example` - Example PRD format
 ## Patterns
 
+- Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); do not install project toolchains on the host
 - Each iteration spawns a fresh AI instance (Amp or Claude Code) with clean context
 - Memory persists via git history, `progress.txt`, and `prd.json`
 - Stories should be small enough to complete in one context window

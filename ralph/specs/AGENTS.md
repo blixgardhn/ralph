@@ -6,6 +6,7 @@ Ralph is responsible for:
 - Creating and maintaining its own automation tools (e.g., observe.sh, verify.sh)
 - Writing and updating documentation and process artifacts
 - Recording state and decisions in IMPLEMENTATION_PLAN.md and progress.md
+- Running all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose) so the host remains clean of project toolchains
 
 All long-term memory and decision rationale must live in the repository.
 

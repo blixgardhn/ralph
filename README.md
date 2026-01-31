@@ -8,13 +8,18 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
 
+All project dependency installation, linting, testing, builds, and database seeding must run inside containers (Docker/Podman/Compose). Keep the host clean of project toolchains.
+
 ## Prerequisites
 
-- One of the following AI coding tools installed and authenticated:
+- Docker or Podman with Compose support (all installs/tests/builds run in containers)
+- One of the following AI coding tools installed and authenticated on the host:
   - [Amp CLI](https://ampcode.com) (default)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-- `jq` installed (`brew install jq` on macOS)
+- `jq` installed on the host (`brew install jq` on macOS)
 - A git repository for your project
+
+Project dependencies, linting, testing, builds, and database seeding must be executed via container entrypoints (e.g., `docker compose run` / `podman compose run`). Do not install project toolchains on the host.
 
 ## Setup
 
@@ -32,6 +37,8 @@ cp /path/to/ralph/prompt.md scripts/ralph/prompt.md
 
 chmod +x scripts/ralph/ralph.sh
 ```
+
+Run project commands through container entrypoints (docker compose / podman compose). Keep project dependencies out of the host.
 
 ### Option 2: Install skills globally (Amp)
 
@@ -99,7 +106,7 @@ Ralph will:
 1. Create a feature branch (from PRD `branchName`)
 2. Pick the highest priority story where `passes: false`
 3. Implement that single story
-4. Run quality checks (typecheck, tests)
+4. Run quality checks inside containers (typecheck, tests; no host toolchains)
 5. Commit if checks pass
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.txt`
