@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
+Ralph is an autonomous AI agent loop that runs AI coding tools (OpenCode by default, or Amp/Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
 
 ## Commands
 
@@ -22,7 +22,7 @@ Ralph is an autonomous AI agent loop that runs AI coding tools (Amp or Claude Co
 ## Patterns
 
 - Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); do not install project toolchains on the host
-- Each iteration spawns a fresh AI instance (Amp or Claude Code) with clean context
+- Each iteration spawns a fresh AI instance (OpenCode/Amp/Claude Code) with clean context
 - Memory persists via git history, `progress.md`, and `prd.json`
 - Stories should be small enough to complete in one context window
 - Always update AGENTS.md with discovered patterns for future iterations

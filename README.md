@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools ([Amp](https://ampcode.com) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.md`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools (OpenCode by default, or [Amp](https://ampcode.com)/[Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.md`, and `prd.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -13,8 +13,9 @@ All project dependency installation, linting, testing, builds, and database seed
 ## Prerequisites
 
 - Docker or Podman with Compose support (all installs/tests/builds run in containers)
-- One of the following AI coding tools installed and authenticated on the host:
-  - [Amp CLI](https://ampcode.com) (default)
+- One of the following AI coding tools installed and authenticated on the host (OpenCode is the default):
+  - OpenCode CLI
+  - [Amp CLI](https://ampcode.com)
   - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
 - `jq` installed on the host (`brew install jq` on macOS)
 - A git repository for your project
@@ -40,7 +41,7 @@ chmod +x scripts/ralph/ralph.sh
 
 Run project commands through container entrypoints (docker compose / podman compose). Keep project dependencies out of the host.
 
-### Option 2: Install skills globally (Amp)
+### Option 2: Install skills globally (Amp/Claude)
 
 Copy the skills to your Amp or Claude config for use across all projects:
 
@@ -93,14 +94,17 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-# Using Amp (default)
+# Using OpenCode (default)
 ./scripts/ralph/ralph.sh [max_iterations]
+
+# Using Amp
+./scripts/ralph/ralph.sh --tool amp [max_iterations]
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to select your AI coding tool.
+Default is 10 iterations. Use `--tool amp` or `--tool claude` to override the default OpenCode tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -116,7 +120,7 @@ Ralph will:
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`) |
+| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool opencode|amp|claude`, default OpenCode) |
 | `prompt.md` | Prompt template for the AI tool |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
@@ -128,7 +132,7 @@ Ralph will:
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new AI instance** (Amp or Claude Code) with clean context. The only memory between iterations is:
+Each iteration spawns a **new AI instance** (OpenCode/Amp/Claude Code) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.md` (learnings and context)
 - `prd.json` (which stories are done)
