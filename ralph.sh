@@ -149,11 +149,6 @@ if [ ! -f "$PROGRESS_FILE" ]; then
 fi
 
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-if [[ "$GIT_BRANCH" =~ ^(main|master)$ && $FORCE_MAIN -ne 1 ]]; then
-  log_line "Refusing to run on $GIT_BRANCH. Use --force-main to override."
-  echo "Refusing to run on $GIT_BRANCH. Use --force-main to override." >&2
-  exit 1
-fi
 
 # Dirty tree guard
 if [ $ALLOW_DIRTY -ne 1 ]; then
@@ -184,12 +179,19 @@ if [ -z "$TARGET_BRANCH" ]; then
   TARGET_BRANCH="$GIT_BRANCH"
 fi
 
+# Auto-divert from main/master to a feature branch unless forced
+if [[ "$TARGET_BRANCH" =~ ^(main|master)$ && $FORCE_MAIN -ne 1 ]]; then
+  BASE_BRANCH="$TARGET_BRANCH"
+  TARGET_BRANCH="ralph/$(date +%Y%m%d%H%M%S)"
+  log_line "On $BASE_BRANCH; creating feature branch $TARGET_BRANCH (override with --force-main)"
+fi
+
 # Ensure branch exists/checked out
 if [ -n "$TARGET_BRANCH" ]; then
   if git show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
     git checkout "$TARGET_BRANCH" >/dev/null 2>&1 || git checkout "$TARGET_BRANCH"
   else
-    echo "Creating branch $TARGET_BRANCH from current HEAD"
+    log_line "Creating branch $TARGET_BRANCH from current HEAD"
     git checkout -b "$TARGET_BRANCH"
   fi
 fi

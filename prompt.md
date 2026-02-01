@@ -6,7 +6,7 @@ You are an autonomous coding agent working on a software project.
 
 1. Read the PRD at `prd.json` (in the same directory as this file)
 2. Read the progress log at `progress.md` (check Codebase Patterns section first)
-3. Check you're on the correct feature branch. Default to PRD `branchName`; for each story, create/use a feature branch like `ralph/<StoryID>` (e.g., `ralph/US-001`) off main if it doesn't exist.
+3. If on main/master, create/switch to a feature branch before work. Default to PRD `branchName`; for each story, create/use a feature branch like `ralph/<StoryID>` (e.g., `ralph/US-001`) off main if it doesn't exist.
 4. Pick the **highest priority** user story where `passes: false`
 5. Implement that single user story
 6. Run quality checks **inside containers only** (typecheck, lint, test). Never install toolchains on the host. Use project entrypoints like `docker compose run <svc> ...`.
