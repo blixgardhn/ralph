@@ -123,6 +123,12 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     exit 0
   fi
 
+  if echo "$OUTPUT" | grep -q "<promise>STOP</promise>"; then
+    echo ""
+    echo "Ralph requested stop at iteration $i."
+    exit 0
+  fi
+
   echo "Iteration $i finished; continuing..."
 done
 
