@@ -18,6 +18,7 @@ Copy the minimal Ralph runner files into another repository so `ralph.sh` can ru
 4. Ask for explicit confirmation BEFORE copying
 5. Copy files into the target workspace; when creating task files, use zero-padded numbering prefixes (0001, 0002, ...)
 6. Report what was added/overwritten
+7. Ensure `ralph.sh` remains executable (`chmod +x`) and uses LF line endings (fix if needed)
 
 ---
 
@@ -55,6 +56,7 @@ export RALPH_SOURCE_DIR=/path/to/ralph
 - Always ask for confirmation before copying
 - If any destination paths already exist, show them and ask whether to overwrite
 - If the target path does not exist, ask the user whether to create it
+- After copying, re-assert permissions and line endings on scripts (e.g., `ralph.sh` executable, LF endings)
 
 ---
 
