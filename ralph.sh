@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [--tool opencode|amp|claude] [max_iterations]
 
@@ -7,6 +7,7 @@ set -e
 # Parse arguments
 TOOL="opencode"  # Default to opencode for backwards compatibility
 MAX_ITERATIONS=10
+FORCE_MAIN=0
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -16,6 +17,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --tool=*)
       TOOL="${1#*=}"
+      shift
+      ;;
+    --force-main)
+      FORCE_MAIN=1
       shift
       ;;
     *)
@@ -43,21 +48,18 @@ LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
   LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
-  
+
   if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
-    # Archive the previous run
     DATE=$(date +%Y-%m-%d)
-    # Strip "ralph/" prefix from branch name for folder
     FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
     ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
-    
-    echo "Archiving previous run: $LAST_BRANCH"
+
+    echo "Archiving previous run: $LAST_BRANCH -> $ARCHIVE_FOLDER"
     mkdir -p "$ARCHIVE_FOLDER"
     [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
     [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
-    echo "   Archived to: $ARCHIVE_FOLDER"
-    
-    # Reset progress file for new run
+    echo "Archive complete: $ARCHIVE_FOLDER/prd.json and progress.md"
+
     {
       echo "## Codebase Patterns"
       echo "- Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); keep the host free of project toolchains"
@@ -89,7 +91,31 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   } > "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+CURRENT_BRANCH=""
+if [ -f "$PRD_FILE" ]; then
+  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
+  if [ -n "$CURRENT_BRANCH" ]; then
+    echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
+  fi
+fi
+
+GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+if [[ "$GIT_BRANCH" =~ ^(main|master)$ && $FORCE_MAIN -ne 1 ]]; then
+  echo "Refusing to run on $GIT_BRANCH. Use --force-main to override." >&2
+  exit 1
+fi
+
+# Ensure branch exists/checked out if PRD specifies one
+if [ -n "$CURRENT_BRANCH" ]; then
+  if git show-ref --verify --quiet "refs/heads/$CURRENT_BRANCH"; then
+    git checkout "$CURRENT_BRANCH" >/dev/null 2>&1 || git checkout "$CURRENT_BRANCH"
+  else
+    echo "Creating branch $CURRENT_BRANCH from current HEAD"
+    git checkout -b "$CURRENT_BRANCH"
+  fi
+fi
+
+echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Branch: ${CURRENT_BRANCH:-$GIT_BRANCH}"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
@@ -113,7 +139,6 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     # OUTPUT=$(opencode run --format json "$PROMPT_TEXT" 2>&1 | tee /dev/stderr) || true
   fi
 
-  
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
@@ -121,7 +146,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     echo "Completed at iteration $i of $MAX_ITERATIONS"
     exit 0
   fi
-  
+
   echo "Iteration $i complete. Continuing..."
   sleep 2
 done

@@ -9,7 +9,7 @@ You are an autonomous coding agent working on a software project.
 3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
 4. Pick the **highest priority** user story where `passes: false`
 5. Implement that single user story
-6. Run quality checks inside containers only (e.g., typecheck, lint, test - do not install toolchains on the host; use your project's container entrypoints)
+6. Run quality checks **inside containers only** (typecheck, lint, test). Never install toolchains on the host. Use project entrypoints like `docker compose run <svc> ...`.
 7. Update AGENTS.md files if you discover reusable patterns (see below)
 8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
 9. Update the PRD to set `passes: true` for the completed story
@@ -22,6 +22,7 @@ APPEND to progress.md (never replace, always append):
 ## [Date/Time] - [Story ID]
 - What was implemented
 - Files changed
+- Checks run (command + result)
 - **Learnings for future iterations:**
   - Patterns discovered (e.g., "this codebase uses X for Y")
   - Gotchas encountered (e.g., "don't forget to update Z when changing W")
@@ -72,10 +73,11 @@ Only update AGENTS.md if you have **genuinely reusable knowledge** that would he
 
 ## Quality Requirements
 
-- ALL commits must pass your project's quality checks (typecheck, lint, test)
+- ALL commits must pass your project's quality checks (typecheck, lint, test). Default placeholders if project-specific commands are missing: `docker compose run app npm run lint`, `docker compose run app npm test`. Replace with project-specific entrypoints.
 - Do NOT commit broken code
 - Keep changes focused and minimal
 - Follow existing code patterns
+- Never run host-level installs or tooling; use containers only.
 
 ## Browser Testing (Required for Frontend Stories)
 
@@ -87,6 +89,8 @@ For any story that changes UI, you MUST verify it works in the browser:
 4. Take a screenshot if helpful for the progress log
 
 A frontend story is NOT complete until browser verification passes.
+
+Add acceptance criteria: "Verify in browser using dev-browser skill" to UI stories.
 
 ## Stop Condition
 
@@ -107,3 +111,11 @@ If there are still stories with `passes: false`, end your response normally (ano
 - Keep CI green
 - Read the Codebase Patterns section in progress.md before starting
 - Run all dependency installs, tooling, tests, builds, and seeding inside containers only; keep the host clean of project toolchains
+
+### Context Discipline
+- Avoid loading large binaries or irrelevant files; keep context tight.
+- If a story feels too big, split it before proceeding.
+- Prefer focused diffs; do not refactor unrelated areas in the same iteration.
+
+### Secret Safety
+- Never commit `.env`, `credentials.*`, cloud keys, or secrets. If such files are present or staged, warn and remove them from the commit plan.
