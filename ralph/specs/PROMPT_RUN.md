@@ -47,6 +47,9 @@ Hard invariants:
 - Do not introduce secrets or real credentials.
 - If there is no SPEC GAP between PRD and code, exit the loop and do no more work
 
+Spec gaps (must record):
+- If PRD, plan, or code conflict or leave material ambiguity, log a SPEC GAP in progress.md and IMPLEMENTATION_PLAN.md before proceeding. Resolve or escalate; do not silently choose an interpretation.
+
 ## Paths (critical)
 - Use repo-relative paths only (no /app/...).
 - Examples:
@@ -59,6 +62,9 @@ Hard invariants:
 - All new or modified application code must be under `src/`.
 - Commit to git repo every iteration of code that completes a feature
 - Make sure commit message is descriptive and correct under best practice
+
+Container mandate
+- All installs/tests/builds/seeding must run in containers (Docker/Podman/Compose). Never install toolchains on host. Use project entrypoints (e.g., `docker compose run <svc> npm test`).
 
 ## Tool protocol (critical)
 - Do NOT emit <write_to_file> blocks. That is not a supported tool here.
@@ -75,6 +81,12 @@ Hard invariants:
 - Append to progress.md whenever you take action or learn something important.
 - Commit changes when appropriate, preferably after each finished task.
 - Only commit working code
+
+Iteration log
+- Append a one-line summary per run to ralph.log (mode, top item/story id, checks run, result: success/fail/blocked). Keep it concise.
+
+Stop condition clarity
+- If all plan items are complete, no spec gaps remain, and PRD is satisfied, write STOP to ralph/state/next_mode.txt and do not modify code.
 
 ## Memory model
 - Do not rely on conversational memory.

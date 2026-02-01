@@ -78,6 +78,8 @@ Only update AGENTS.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 - Never run host-level installs or tooling; use containers only.
+- If any required checks fail, leave a marker file `.ralph-test-failed` (already handled by harness) so the next run halts until resolved.
+- Log iterations to `ralph.log`; keep summaries concise.
 
 ## Browser Testing (Required for Frontend Stories)
 

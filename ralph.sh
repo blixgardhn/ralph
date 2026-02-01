@@ -8,6 +8,8 @@ set -e
 TOOL="opencode"  # Default to opencode for backwards compatibility
 MAX_ITERATIONS=10
 FORCE_MAIN=0
+ALLOW_DIRTY=0
+CLEAR_FAILED=0
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -21,6 +23,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force-main)
       FORCE_MAIN=1
+      shift
+      ;;
+    --allow-dirty)
+      ALLOW_DIRTY=1
+      shift
+      ;;
+    --clear-failed)
+      CLEAR_FAILED=1
       shift
       ;;
     *)
@@ -44,6 +54,8 @@ PROGRESS_FILE="$SCRIPT_DIR/progress.md"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
 LAST_PRD_HASH_FILE="$SCRIPT_DIR/.last-prd-hash"
+FAILED_FILE="$SCRIPT_DIR/.ralph-test-failed"
+LOG_FILE="$SCRIPT_DIR/ralph.log"
 
 # Archive previous run if branch changed or PRD content changed
 PRD_HASH=""
@@ -64,6 +76,13 @@ if [ -n "$PRD_HASH" ] && [ -n "$LAST_PRD_HASH" ] && [ "$PRD_HASH" != "$LAST_PRD_
   PRD_CHANGED=1
 fi
 
+touch "$LOG_FILE"
+log_line() {
+  local ts
+  ts=$(date -Is)
+  echo "[$ts] $1" | tee -a "$LOG_FILE"
+}
+
 ARCHIVE_REASON=""
 if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
   ARCHIVE_REASON="branch change"
@@ -81,11 +100,11 @@ if [ -n "$ARCHIVE_REASON" ]; then
   FOLDER_NAME=$(echo "${LAST_BRANCH:-$CURRENT_BRANCH:-unknown-prd}" | sed 's|^ralph/||')
   ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
 
-  echo "Archiving previous run due to: $ARCHIVE_REASON -> $ARCHIVE_FOLDER"
+  log_line "Archiving previous run due to: $ARCHIVE_REASON -> $ARCHIVE_FOLDER"
   mkdir -p "$ARCHIVE_FOLDER"
   [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
   [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
-  echo "Archive complete: $ARCHIVE_FOLDER/prd.json and progress.md"
+  log_line "Archive complete: $ARCHIVE_FOLDER/prd.json and progress.md"
 
   {
     echo "## Codebase Patterns"
@@ -122,8 +141,29 @@ fi
 
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 if [[ "$GIT_BRANCH" =~ ^(main|master)$ && $FORCE_MAIN -ne 1 ]]; then
+  log_line "Refusing to run on $GIT_BRANCH. Use --force-main to override."
   echo "Refusing to run on $GIT_BRANCH. Use --force-main to override." >&2
   exit 1
+fi
+
+# Dirty tree guard
+if [ $ALLOW_DIRTY -ne 1 ]; then
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    log_line "Working tree is dirty. Commit, stash, or rerun with --allow-dirty."
+    echo "Working tree is dirty. Commit, stash, or rerun with --allow-dirty." >&2
+    exit 1
+  fi
+fi
+
+# Failed checks guard
+if [ -f "$FAILED_FILE" ] && [ $CLEAR_FAILED -ne 1 ]; then
+  log_line "Previous iteration recorded failed checks. Resolve and remove $FAILED_FILE or rerun with --clear-failed."
+  echo "Previous iteration recorded failed checks. Resolve and remove $FAILED_FILE or rerun with --clear-failed." >&2
+  exit 1
+fi
+if [ $CLEAR_FAILED -eq 1 ]; then
+  rm -f "$FAILED_FILE"
+  log_line "Cleared failed-check marker ($FAILED_FILE)"
 fi
 
 # Ensure branch exists/checked out if PRD specifies one
@@ -136,10 +176,12 @@ if [ -n "$CURRENT_BRANCH" ]; then
   fi
 fi
 
+log_line "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Branch: ${CURRENT_BRANCH:-$GIT_BRANCH}"
 echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Branch: ${CURRENT_BRANCH:-$GIT_BRANCH}"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
+  log_line "Iteration $i/$MAX_ITERATIONS start"
   echo "==============================================================="
   echo "  Ralph Iteration $i of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
@@ -162,16 +204,19 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
+    log_line "COMPLETE signal received at iteration $i"
     echo ""
     echo "Ralph completed all tasks!"
     echo "Completed at iteration $i of $MAX_ITERATIONS"
     exit 0
   fi
 
+  log_line "Iteration $i complete. Continuing..."
   echo "Iteration $i complete. Continuing..."
   sleep 2
 done
 
+log_line "Reached max iterations ($MAX_ITERATIONS) without completion"
 echo ""
 echo "Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks."
 echo "Check $PROGRESS_FILE for status."
