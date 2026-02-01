@@ -100,6 +100,9 @@ If there are still stories with `passes: false`, end your response normally (ano
 ## Important
 
 - Work on ONE story per iteration
+- Keep each loop's working context intentionally small; split work so iterations stay focused and fast
+- Verify each iteration's output before starting a new task; if blocked by tooling/external issues (e.g., Docker unavailable, missing commit/push permissions), exit the loop with a clear failure reason
+- At the end of each iteration, verify the output; for coding tasks, run tests—if tests fail, restart the task; if you cannot fix within the iteration, exit with a clear failure reason
 - Commit frequently
 - Keep CI green
 - Read the Codebase Patterns section in progress.md before starting

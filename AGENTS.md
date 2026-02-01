@@ -25,4 +25,7 @@ Ralph is an autonomous AI agent loop that runs AI coding tools (OpenCode by defa
 - Each iteration spawns a fresh AI instance (OpenCode/Amp/Claude Code) with clean context
 - Memory persists via git history, `progress.md`, and `prd.json`
 - Stories should be small enough to complete in one context window
+- Keep each loop's working context intentionally small; split work so iterations stay focused and fast
+- Verify each iteration's output before starting a new task; if blocked by tooling/external issues (e.g., Docker unavailable, missing commit/push permissions), exit the loop with a clear failure reason
+- At the end of each iteration, verify the output; for coding tasks, run tests—if tests fail, restart the task; if you cannot fix within the iteration, exit with a clear failure reason
 - Always update AGENTS.md with discovered patterns for future iterations
