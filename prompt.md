@@ -14,6 +14,7 @@ Steps:
 8) Do not commit.
 9) Update `prd.json` to mark the story `passes: true` when done.
 10) Append a concise but rich log to `progress.md`.
+11) If you cannot complete the current story (or unblock missing tools/code) within this iteration, stop immediately and reply `<promise>STOP</promise>` with a brief reason. Do not proceed to any other story.
 
 Progress log append format (to `progress.md`):
 ```

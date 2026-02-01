@@ -24,3 +24,4 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 - Update `prd.json` `passes` when a story is finished
 - Logs live in `progress.md` only: note key files/functions, commands run (including tests), outcomes, follow-ups
 - If required tools/entrypoints/tests or blocking code gaps exist, fix or create them first, then proceed with the story
+- If a story cannot be completed (or unblocked) in the iteration, stop and exit without moving to another story
