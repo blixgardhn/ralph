@@ -39,7 +39,8 @@ If the user asks for additional items, include them (for example `prd.json.examp
 
 ## Source Repo Resolution
 
-- The source is always this Ralph repo (the one containing this skill). Do not ask for or use any other source path or env var.
+- If `RALPH_SOURCE_DIR` is set, use it as the source repo root.
+- Otherwise, default to this Ralph repo (the one containing this skill). Do not prompt for any other source path.
 
 ---
 
