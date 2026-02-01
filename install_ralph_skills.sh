@@ -30,7 +30,7 @@ for SKILL_NAME in prd ralph_prd ralph_setup; do
 
   rm -rf "$DEST_PATH"
   mkdir -p "$DEST_PATH"
-  cp -R "$SRC_PATH/" "$DEST_PATH/"
+  cp -R "$SRC_PATH/." "$DEST_PATH/"
   echo "Installed $SKILL_NAME to $DEST_PATH"
 done
 
