@@ -39,15 +39,7 @@ If the user asks for additional items, include them (for example `prd.json.examp
 
 ## Source Repo Resolution
 
-- If `RALPH_SOURCE_DIR` is set, use it as the source repo root.
-- Else, if `ralph.sh` exists at the current repo root, use the current repo.
-- Else, ask the user for the Ralph repo absolute path.
-
-Example env var setup:
-
-```bash
-export RALPH_SOURCE_DIR=/path/to/ralph
-```
+- The source is always this Ralph repo (the one containing this skill). Do not ask for or use any other source path or env var.
 
 ---
 
