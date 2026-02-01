@@ -6,7 +6,7 @@ set -euo pipefail
 # Usage: ./install_ralph_skills.sh [target_dir]
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REPO_ROOT="$SCRIPT_DIR"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILLS_SRC="$REPO_ROOT/skills"
 
 if [[ ! -d "$SKILLS_SRC" ]]; then
