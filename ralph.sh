@@ -43,39 +43,68 @@ PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.md"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
+LAST_PRD_HASH_FILE="$SCRIPT_DIR/.last-prd-hash"
 
-# Archive previous run if branch changed
-if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
+# Archive previous run if branch changed or PRD content changed
+PRD_HASH=""
+LAST_PRD_HASH=""
+PRD_CHANGED=0
+CURRENT_BRANCH=""
+LAST_BRANCH=""
+
+if [ -f "$PRD_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
-  LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
+  PRD_HASH=$(sha1sum "$PRD_FILE" | awk '{print $1}')
+fi
 
-  if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
-    DATE=$(date +%Y-%m-%d)
-    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
-    ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
+[ -f "$LAST_BRANCH_FILE" ] && LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
+[ -f "$LAST_PRD_HASH_FILE" ] && LAST_PRD_HASH=$(cat "$LAST_PRD_HASH_FILE" 2>/dev/null || echo "")
 
-    echo "Archiving previous run: $LAST_BRANCH -> $ARCHIVE_FOLDER"
-    mkdir -p "$ARCHIVE_FOLDER"
-    [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
-    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
-    echo "Archive complete: $ARCHIVE_FOLDER/prd.json and progress.md"
+if [ -n "$PRD_HASH" ] && [ -n "$LAST_PRD_HASH" ] && [ "$PRD_HASH" != "$LAST_PRD_HASH" ]; then
+  PRD_CHANGED=1
+fi
 
-    {
-      echo "## Codebase Patterns"
-      echo "- Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); keep the host free of project toolchains"
-      echo ""
-      echo "# Ralph Progress Log"
-      echo "Started: $(date)"
-      echo "---"
-    } > "$PROGRESS_FILE"
+ARCHIVE_REASON=""
+if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
+  ARCHIVE_REASON="branch change"
+fi
+if [ $PRD_CHANGED -eq 1 ]; then
+  if [ -n "$ARCHIVE_REASON" ]; then
+    ARCHIVE_REASON="$ARCHIVE_REASON + new PRD content"
+  else
+    ARCHIVE_REASON="new PRD content"
   fi
 fi
 
-# Track current branch
+if [ -n "$ARCHIVE_REASON" ]; then
+  DATE=$(date +%Y-%m-%d)
+  FOLDER_NAME=$(echo "${LAST_BRANCH:-$CURRENT_BRANCH:-unknown-prd}" | sed 's|^ralph/||')
+  ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
+
+  echo "Archiving previous run due to: $ARCHIVE_REASON -> $ARCHIVE_FOLDER"
+  mkdir -p "$ARCHIVE_FOLDER"
+  [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
+  [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
+  echo "Archive complete: $ARCHIVE_FOLDER/prd.json and progress.md"
+
+  {
+    echo "## Codebase Patterns"
+    echo "- Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); keep the host free of project toolchains"
+    echo ""
+    echo "# Ralph Progress Log"
+    echo "Started: $(date)"
+    echo "---"
+  } > "$PROGRESS_FILE"
+fi
+
+# Track current branch and PRD hash
 if [ -f "$PRD_FILE" ]; then
   CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
   if [ -n "$CURRENT_BRANCH" ]; then
     echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
+  fi
+  if [ -n "$PRD_HASH" ]; then
+    echo "$PRD_HASH" > "$LAST_PRD_HASH_FILE"
   fi
 fi
 
@@ -89,14 +118,6 @@ if [ ! -f "$PROGRESS_FILE" ]; then
     echo "Started: $(date)"
     echo "---"
   } > "$PROGRESS_FILE"
-fi
-
-CURRENT_BRANCH=""
-if [ -f "$PRD_FILE" ]; then
-  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
-  if [ -n "$CURRENT_BRANCH" ]; then
-    echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
-  fi
 fi
 
 GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")

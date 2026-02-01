@@ -41,6 +41,8 @@ chmod +x scripts/ralph/ralph.sh
 
 Run project commands through container entrypoints (docker compose / podman compose). Keep project dependencies out of the host.
 
+When you start a new PRD (or edit the current `prd.json`), Ralph auto-archives the previous run’s `prd.json` and `progress.md` into `archive/YYYY-MM-DD-<branch>/` and resets `progress.md` so each requirement set stays isolated.
+
 ### Option 2: Install skills globally (Amp/Claude)
 
 Copy the skills to your Amp or Claude config for use across all projects:
