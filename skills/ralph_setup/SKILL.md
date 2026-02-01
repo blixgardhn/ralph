@@ -16,7 +16,7 @@ Copy the minimal Ralph runner files into another repository so `ralph.sh` can ru
 2. Resolve the Ralph source path
 3. Show the exact files/folders that will be copied
 4. Ask for explicit confirmation BEFORE copying
-5. Copy files into the target workspace
+5. Copy files into the target workspace; when creating task files, use zero-padded numbering prefixes (0001, 0002, ...)
 6. Report what was added/overwritten
 
 ---

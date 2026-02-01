@@ -15,7 +15,7 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 1. Receive a feature description from the user
 2. Ask 3-5 essential clarifying questions (with lettered options)
 3. Generate a structured PRD based on answers
-4. Save to `tasks/prd-[feature-name].md`
+4. Save to `tasks/NNNN-prd-[feature-name].md` where `NNNN` is zero-padded (0001, 0002, ...). Use the next available number in `tasks/`.
 
 **Important:** Do NOT start implementing. Just create the PRD.
 
@@ -136,7 +136,7 @@ The PRD reader may be a junior developer or AI agent. Therefore:
 
 - **Format:** Markdown (`.md`)
 - **Location:** `tasks/`
-- **Filename:** `prd-[feature-name].md` (kebab-case)
+- **Filename:** `NNNN-prd-[feature-name].md` (kebab-case), where `NNNN` is the next zero-padded number
 
 ---
 

@@ -12,7 +12,7 @@ Converts existing PRDs to the prd.json format that Ralph uses for autonomous exe
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory.
+Take a PRD (markdown file or text) and convert it to `prd.json` in your ralph directory. When creating task files during conversion, use zero-padded numbering (0001, 0002, ...) prefixed to filenames.
 
 ---
 
