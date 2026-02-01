@@ -1,31 +1,26 @@
-# Ralph Agent Instructions
+# Ralph Agent (Lean)
 
 ## Overview
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (OpenCode by default, or Amp/Claude Code) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context.
+Lean loop to run a single-iteration agent until PRD stories are done. Progress is tracked only in `progress.md`.
 
-## Commands
+## Command
 
 ```bash
-# Run Ralph with Amp (default)
-./ralph.sh [max_iterations]
-
-# Run Ralph with Claude Code
-./ralph.sh --tool claude [max_iterations]
+./ralph.sh [--tool opencode|amp|claude] [max_iterations]
 ```
 
 ## Key Files
 
-- `ralph.sh` - The bash loop that spawns fresh AI instances (supports `--tool amp` or `--tool claude`)
-- `prompt.md` - Instructions given to the AI tool
-- `prd.json.example` - Example PRD format
+- `ralph.sh` - thin loop runner
+- `prompt.md` - instructions for the agent
+- `prd.json.example` - PRD format example
+
 ## Patterns
 
-- Run all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose); do not install project toolchains on the host
-- Each iteration spawns a fresh AI instance (OpenCode/Amp/Claude Code) with clean context
-- Memory persists via git history, `progress.md`, and `prd.json`
-- Stories should be small enough to complete in one context window
-- Keep each loop's working context intentionally small; split work so iterations stay focused and fast
-- Verify each iteration's output before starting a new task; if blocked by tooling/external issues (e.g., Docker unavailable, missing commit/push permissions), exit the loop with a clear failure reason
-- At the end of each iteration, verify the output; for coding tasks, run tests—if tests fail, restart the task; if you cannot fix within the iteration, exit with a clear failure reason
-- Always update AGENTS.md with discovered patterns for future iterations
+- Keep iterations small; one story per run
+- Prefer containerized tooling; avoid host installs
+- Append progress to `progress.md`; keep `Codebase Patterns` concise but useful
+- Update `prd.json` `passes` when a story is finished
+- Logs live in `progress.md` only: note key files/functions, commands run (including tests), outcomes, follow-ups
+- If required tools/entrypoints/tests or blocking code gaps exist, fix or create them first, then proceed with the story
