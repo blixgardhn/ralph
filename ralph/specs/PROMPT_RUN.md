@@ -22,7 +22,7 @@ You must:
 2) Decide whether to PLAN or BUILD:
    - PLAN if the plan is missing, stale, unclear, blocked, or not derived from prd.json/current reality.
    - BUILD if the plan is clear and has at least one actionable top-priority unchecked item.
-3) Write your decision to: ralph/state/next_mode.txt (exactly PLAN or BUILD; you may write STOP if everything is done).
+ 3) Write your decision to: ralph/state/next_mode.txt (exactly PLAN or BUILD; you may write STOP if everything is done).
 4) Execute the chosen mode:
    - PLAN:
      - Create or revise IMPLEMENTATION_PLAN.md so it reflects current repo reality and prd.json.
@@ -60,6 +60,7 @@ Spec gaps (must record):
 ## BUILD mode responsibilities 
 - Implement EXACTLY ONE highest-priority unchecked plan item.
 - All new or modified application code must be under `src/`.
+- Work on a feature branch per story (e.g., `ralph/<StoryID>`). Do not commit to main/master.
 - Commit to git repo every iteration of code that completes a feature
 - Make sure commit message is descriptive and correct under best practice
 

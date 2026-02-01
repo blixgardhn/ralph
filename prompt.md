@@ -6,12 +6,12 @@ You are an autonomous coding agent working on a software project.
 
 1. Read the PRD at `prd.json` (in the same directory as this file)
 2. Read the progress log at `progress.md` (check Codebase Patterns section first)
-3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
+3. Check you're on the correct feature branch. Default to PRD `branchName`; for each story, create/use a feature branch like `ralph/<StoryID>` (e.g., `ralph/US-001`) off main if it doesn't exist.
 4. Pick the **highest priority** user story where `passes: false`
 5. Implement that single user story
 6. Run quality checks **inside containers only** (typecheck, lint, test). Never install toolchains on the host. Use project entrypoints like `docker compose run <svc> ...`.
 7. Update AGENTS.md files if you discover reusable patterns (see below)
-8. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+8. Commit ONLY after checks pass. Use message: `feat: [Story ID] - [Story Title]`
 9. Update the PRD to set `passes: true` for the completed story
 10. Append your progress to `progress.md`
 

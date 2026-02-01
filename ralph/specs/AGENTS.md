@@ -23,6 +23,10 @@ All long-term memory and decision rationale must live in the repository.
 - If repo includes formatting/analyzers, verify.sh must enforce them (e.g., dotnet format --verify-no-changes).
 - verify.sh must print clear step banners.
 
+## Branching and commits
+- Each task/story should use a feature branch (e.g., `ralph/<StoryID>`). Do not work directly on main/master.
+- Commit only after verification passes (containerized checks). No WIP commits.
+
 ## Browser verification
 - Some stories require manual verification (“dev-browser skill”). Ralph must:
   - Output a “Manual Verification Steps” section in progress.md for those stories.

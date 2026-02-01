@@ -10,6 +10,7 @@ MAX_ITERATIONS=10
 FORCE_MAIN=0
 ALLOW_DIRTY=0
 CLEAR_FAILED=0
+FEATURE_BRANCH=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -31,6 +32,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --clear-failed)
       CLEAR_FAILED=1
+      shift
+      ;;
+    --feature-branch)
+      FEATURE_BRANCH="$2"
+      shift 2
+      ;;
+    --feature-branch=*)
+      FEATURE_BRANCH="${1#*=}"
       shift
       ;;
     *)
@@ -166,18 +175,27 @@ if [ $CLEAR_FAILED -eq 1 ]; then
   log_line "Cleared failed-check marker ($FAILED_FILE)"
 fi
 
-# Ensure branch exists/checked out if PRD specifies one
-if [ -n "$CURRENT_BRANCH" ]; then
-  if git show-ref --verify --quiet "refs/heads/$CURRENT_BRANCH"; then
-    git checkout "$CURRENT_BRANCH" >/dev/null 2>&1 || git checkout "$CURRENT_BRANCH"
+# Determine target branch: CLI override > PRD branchName > current
+TARGET_BRANCH="$FEATURE_BRANCH"
+if [ -z "$TARGET_BRANCH" ] && [ -n "$CURRENT_BRANCH" ]; then
+  TARGET_BRANCH="$CURRENT_BRANCH"
+fi
+if [ -z "$TARGET_BRANCH" ]; then
+  TARGET_BRANCH="$GIT_BRANCH"
+fi
+
+# Ensure branch exists/checked out
+if [ -n "$TARGET_BRANCH" ]; then
+  if git show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"; then
+    git checkout "$TARGET_BRANCH" >/dev/null 2>&1 || git checkout "$TARGET_BRANCH"
   else
-    echo "Creating branch $CURRENT_BRANCH from current HEAD"
-    git checkout -b "$CURRENT_BRANCH"
+    echo "Creating branch $TARGET_BRANCH from current HEAD"
+    git checkout -b "$TARGET_BRANCH"
   fi
 fi
 
-log_line "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Branch: ${CURRENT_BRANCH:-$GIT_BRANCH}"
-echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Branch: ${CURRENT_BRANCH:-$GIT_BRANCH}"
+log_line "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Branch: ${TARGET_BRANCH}"
+echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS - Branch: ${TARGET_BRANCH}"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
