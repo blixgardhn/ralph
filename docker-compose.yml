@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ralph-run
+      args:
+        - BASE_IMAGE=${RALPH_BASE_IMAGE:-debian:bookworm-slim}
     image: ${RALPH_RUNNER_IMAGE:-ralph-run:local}
     working_dir: /app/dest_repo
     environment:
