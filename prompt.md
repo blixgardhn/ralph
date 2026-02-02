@@ -8,7 +8,7 @@ Steps:
 3) Pick the highest-priority story with `passes: false`.
 4) If `userStories` is empty or malformed, stop and log the issue instead of claiming completion.
 4) Work only on that story.
-5) If the story touches code, run the smallest relevant checks first (targeted tests/lint/typecheck) using project commands; prefer containerized entrypoints if available. Each iteration should execute inside a container built from the smallest base image that fits the task stack. When tests or SDKs are needed and Ralph is already inside a container, spawn a fresh, purpose-built test container (smallest practical base image matching the stack) instead of reusing the runner container.
+5) If the story touches code, run the smallest relevant checks first (targeted tests/lint/typecheck) using project commands; prefer containerized entrypoints if available. Each iteration should execute inside a container built from the smallest base image that fits the task stack (e.g., use `mcr.microsoft.com/dotnet/sdk` when building .NET apps that need the dotnet CLI). When tests or SDKs are needed and Ralph is already inside a container, spawn a fresh, purpose-built test container (smallest practical base image matching the stack) instead of reusing the runner container.
 6) Always run tests (or the nearest equivalent validation) before finishing the story; record the command and result. When this story finishes the PRD (all stories will be passes: true), rerun the full system test suite before replying.
 7) Do not install host toolchains.
 8) Update `.ralph/prd.json` to mark the story `passes: true` when done.
