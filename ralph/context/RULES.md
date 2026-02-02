@@ -20,6 +20,7 @@
 ## Runtime environment
 - Run development, dependency installation, linting, testing, builds, and diagnostics inside containers; keep the host environment untouched.
 - Place a `Dockerfile` in each project when appropriate; multiple Dockerfiles are allowed.
+- Always provide a `docker-compose` setup that lets developers run and test the whole project locally.
 
 ## Repository layout
 - Application source code lives under `src/` at the repository root.
