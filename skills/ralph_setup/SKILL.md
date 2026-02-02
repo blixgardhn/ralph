@@ -1,18 +1,18 @@
 ---
 name: ralph_setup
-description: "Set up Ralph in the caller's current working directory by copying only the required runner files from this Ralph repo. Does not install skills. Triggers on: copy ralph files, bootstrap ralph, setup ralph.sh here."
+description: "Set up Ralph in the caller's current working directory by copying only the required runner files from a Ralph repo (source resolved via env, ../ralph, or user-provided path). Does not install skills. Triggers on: copy ralph files, bootstrap ralph, setup ralph.sh here."
 user-invocable: true
 ---
 
 # Ralph Workspace Bootstrapper (PWD)
 
-Copy the minimal Ralph runner files into the user's current working directory so `ralph.sh` can run there. Source is always this Ralph repository. Do not install skills.
+Copy the minimal Ralph runner files into the user's current working directory so `ralph.sh` can run there. Resolve the source Ralph repo via env/relative path/user input. Do not install skills.
 
 ---
 
 ## The Job
 
-1. Resolve the source path (this Ralph repo only).
+1. Resolve the source path in this order: (a) `RALPH_SOURCE_DIR` env var if set; (b) `../ralph` if it exists; (c) prompt the user for a source path.
 2. Set the destination to the user's current working directory; do not allow any other destination.
 3. Show the exact files/folders that will be copied and any that already exist.
 4. Ask for explicit confirmation BEFORE copying, calling out overwrites.
