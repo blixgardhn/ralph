@@ -19,6 +19,7 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
 6. Keep tasks minimal and focused; split aggressively so each story fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one story.
 7. For each user story, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that story.
+8. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
 
 **Important:** Do NOT implement the feature. Deliver specs only.
 

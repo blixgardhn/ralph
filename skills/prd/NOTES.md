@@ -1,0 +1,1 @@
+Notes: Ensure PRDs include a documentation task when appropriate to update README.md with concise, descriptive content and a Mermaid diagram if feasible. Keep stories split small; add subtasks per story.
