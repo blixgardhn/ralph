@@ -1,2 +1,1 @@
-Placeholder for Ralph setup skills.
-Add your Ralph setup skill files here so install_ralph_skills.sh can copy them into the OpenCode skills directory.
+Bootstrapper that copies only the required Ralph runner files from this repo into the user's current working directory. It does not install skills.

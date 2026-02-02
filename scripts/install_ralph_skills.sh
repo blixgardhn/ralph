@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Install the Ralph skills (prd, ralph_prd, ralph_setup) into OpenCode, Amp, or Claude skills directories.
+# Install the Ralph skills (prd, ralph_setup) into OpenCode, Amp, or Claude skills directories.
 # Usage:
 #   ./install_ralph_skills.sh [target_dir]
 #
@@ -28,7 +28,7 @@ CLAUDE_TARGET="$HOME/.claude/skills"
 install_set() {
   local dest="$1"
   mkdir -p "$dest"
-  for SKILL_NAME in prd ralph_prd ralph_setup; do
+  for SKILL_NAME in prd ralph_setup; do
     local SRC_PATH="$SKILLS_SRC/$SKILL_NAME"
     local DEST_PATH="$dest/$SKILL_NAME"
     if [[ ! -d "$SRC_PATH" ]]; then

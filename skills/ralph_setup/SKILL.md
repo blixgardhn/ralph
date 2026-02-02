@@ -1,6 +1,6 @@
 ---
 name: ralph_setup
-description: "Copy the Ralph runner files into another repo. Use to bootstrap ralph.sh, prompt.md, AGENTS.md, and ralph/ context/specs in a target workspace. Triggers on: copy ralph files, bootstrap ralph, setup ralph.sh in another repo."
+description: "Copy only the required Ralph runner files into the requesting repo (current working directory). Source is always this Ralph repo. Does not install skills. Triggers on: copy ralph files, bootstrap ralph, setup ralph.sh in another repo."
 user-invocable: true
 ---
 
@@ -12,11 +12,11 @@ Copy the minimal Ralph runner files into another repository so `ralph.sh` can ru
 
 ## The Job
 
-1. Ask for the target workspace path (absolute path)
-2. Resolve the Ralph source path
+1. Resolve the source path (this Ralph repo only)
+2. Set the destination to the user's current working directory (no other destination)
 3. Show the exact files/folders that will be copied
 4. Ask for explicit confirmation BEFORE copying
-5. Copy files into the target workspace; when creating task files, use zero-padded numbering prefixes (0001, 0002, ...)
+5. Copy files into the destination; when creating task files, use zero-padded numbering prefixes (0001, 0002, ...)
 6. Report what was added/overwritten
 7. Ensure `ralph.sh` remains executable (`chmod +x`) and uses LF line endings (fix if needed)
 
@@ -24,7 +24,7 @@ Copy the minimal Ralph runner files into another repository so `ralph.sh` can ru
 
 ## Files to Copy (Default)
 
-Use repo-root relative paths. Resolve the source repo first, then join these paths:
+Copy only these repo-root-relative paths from the Ralph source repo:
 
 - `ralph.sh`
 - `prompt.md`
@@ -32,15 +32,17 @@ Use repo-root relative paths. Resolve the source repo first, then join these pat
 - `prd.json.example`
 - `ralph/context/`
 - `ralph/specs/`
-
-If the user asks for additional items, include them (for example `prd.json.example`, `README.md`, or `ralph.webp`).
+Do not copy any other files (no skills, no extras).
 
 ---
 
 ## Source Repo Resolution
 
-- If `RALPH_SOURCE_DIR` is set, use it as the source repo root.
-- Otherwise, default to this Ralph repo (the one containing this skill). Do not prompt for any other source path.
+- Always use this Ralph repository as the source (honor `RALPH_SOURCE_DIR` only when set to this repo path).
+
+## Destination
+
+- Always use the user's current working directory as the destination; do not prompt for or write elsewhere.
 
 ---
 
