@@ -26,3 +26,4 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 - For each completed story: commit all changes (including prd.json and progress.md) with a clear story-specific message and push
 - If required tools/entrypoints/tests or blocking code gaps exist, fix or create them first, then proceed with the story
 - If a story cannot be completed (or unblocked) in the iteration, stop and exit without moving to another story
+- When running the software (any service/app), do so in a container unless explicitly told otherwise
