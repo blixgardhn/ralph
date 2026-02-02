@@ -138,12 +138,12 @@ run_iteration() {
 
   local OUTPUT
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$PROMPT_FILE" | amp --dangerously-allow-all 2>&1 | tee /proc/self/fd/2) || true
+    OUTPUT=$(cat "$PROMPT_FILE" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
   elif [[ "$TOOL" == "claude" ]]; then
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$PROMPT_FILE" 2>&1 | tee /proc/self/fd/2) || true
+    OUTPUT=$(claude --dangerously-skip-permissions --print < "$PROMPT_FILE" 2>&1 | tee >(cat >&2)) || true
   else
     PROMPT_TEXT="$(cat "$PROMPT_FILE")"
-    OUTPUT=$(opencode run "$PROMPT_TEXT" 2>&1 | tee /proc/self/fd/2) || true
+    OUTPUT$(opencode run "$PROMPT_TEXT" 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
