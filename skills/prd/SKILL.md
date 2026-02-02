@@ -1,36 +1,32 @@
 ---
 name: prd
-description: "Generate a Product Requirements Document (PRD) for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out."
+description: "Generate a Product Requirements Document (PRD) and a matching Ralph prd.json. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out, convert to ralph prd.json."
 user-invocable: true
 ---
 
-# PRD Generator
+# PRD + Ralph JSON Generator
 
-Create detailed Product Requirements Documents that are clear, actionable, and suitable for implementation.
+Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ralph. Both outputs must describe the same stories, acceptance criteria, and ordering.
 
 ---
 
 ## The Job
 
-1. Receive a feature description from the user
-2. Ask 3-5 essential clarifying questions (with lettered options)
-3. Generate a structured PRD based on answers
-4. Save to `tasks/NNNN-prd-[feature-name].md` where `NNNN` is zero-padded (0001, 0002, ...). Use the next available number in `tasks/`.
+1. Receive a feature description
+2. Ask 3-5 essential clarifying questions (lettered options)
+3. Generate the PRD in markdown
+4. Generate the matching `prd.json`
+5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
 
-**Important:** Do NOT start implementing. Just create the PRD.
+**Important:** Do NOT implement the feature. Deliver specs only.
 
 ---
 
 ## Step 1: Clarifying Questions
 
-Ask only critical questions where the initial prompt is ambiguous. Focus on:
+Ask only the critical gaps. Focus on Problem/Goal, Core Functionality, Scope/Boundaries, and Success Criteria.
 
-- **Problem/Goal:** What problem does this solve?
-- **Core Functionality:** What are the key actions?
-- **Scope/Boundaries:** What should it NOT do?
-- **Success Criteria:** How do we know it's done?
-
-### Format Questions Like This:
+Format questions with numbered prompts and A/B/C/D options, e.g.:
 
 ```
 1. What is the primary goal of this feature?
@@ -52,190 +48,97 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
    D. Just the UI
 ```
 
-This lets users respond with "1A, 2C, 3B" for quick iteration.
+Users can reply with codes like "1A, 2C, 3B".
 
 ---
 
-## Step 2: PRD Structure
+## Step 2: PRD Structure (Markdown)
 
-Generate the PRD with these sections:
+Sections:
+1. Introduction/Overview — the feature and problem it solves
+2. Goals — measurable objectives
+3. User Stories — each story must be one focused iteration
+   - Title, Description ("As a [user], I want [feature] so that [benefit]"), Acceptance Criteria
+   - UI stories also require: "Verify in browser using dev-browser skill"
+   - Always include: "Typecheck passes"; add "Tests pass" when logic is testable
+4. Functional Requirements — numbered, explicit (FR-1, FR-2...)
+5. Non-Goals — what is out of scope
+6. Design Considerations (optional)
+7. Technical Considerations (optional)
+8. Success Metrics
+9. Open Questions
 
-### 1. Introduction/Overview
-Brief description of the feature and the problem it solves.
-
-### 2. Goals
-Specific, measurable objectives (bullet list).
-
-### 3. User Stories
-Each story needs:
-- **Title:** Short descriptive name
-- **Description:** "As a [user], I want [feature] so that [benefit]"
-- **Acceptance Criteria:** Verifiable checklist of what "done" means
-
-Each story should be small enough to implement in one focused session.
-
-**Format:**
+Story format:
 ```markdown
 ### US-001: [Title]
 **Description:** As a [user], I want [feature] so that [benefit].
 
 **Acceptance Criteria:**
-- [ ] Specific verifiable criterion
-- [ ] Another criterion
-- [ ] Typecheck/lint passes
-- [ ] **[UI stories only]** Verify in browser using dev-browser skill
+- [ ] Verifiable criterion
+- [ ] Another verifiable criterion
+- [ ] Typecheck passes
+- [ ] Tests pass (include when applicable)
+- [ ] Verify in browser using dev-browser skill (UI stories)
 ```
 
-**Important:** 
-- Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
-- **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
+---
 
-### 4. Functional Requirements
-Numbered list of specific functionalities:
-- "FR-1: The system must allow users to..."
-- "FR-2: When a user clicks X, the system must..."
+## Step 3: Ralph prd.json Structure
 
-Be explicit and unambiguous.
+```json
+{
+  "project": "[Project Name]",
+  "branchName": "ralph/[feature-name-kebab-case]",
+  "description": "[Feature description from PRD]",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "[Story title]",
+      "description": "As a [user], I want [feature] so that [benefit]",
+      "acceptanceCriteria": ["Criterion 1", "Criterion 2", "Typecheck passes"],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
+```
 
-### 5. Non-Goals (Out of Scope)
-What this feature will NOT include. Critical for managing scope.
+### Conversion and Sizing Rules
+- Each story must fit in one Ralph iteration; split big items
+- Order by dependencies: schema → backend → UI → summaries
+- IDs sequential (US-001...), priorities follow order
+- Every story has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI
+- `branchName` = `ralph/[feature-name-kebab-case]`
 
-### 6. Design Considerations (Optional)
-- UI/UX requirements
-- Link to mockups if available
-- Relevant existing components to reuse
+---
 
-### 7. Technical Considerations (Optional)
-- Known constraints or dependencies
-- Integration points with existing systems
-- Performance requirements
+## Step 4: Outputs and Sync
 
-### 8. Success Metrics
-How will success be measured?
-- "Reduce time to complete X by 50%"
-- "Increase conversion rate by 10%"
+- **Markdown PRD:** `tasks/NNNN-prd-[feature-name].md` (next zero-padded number)
+- **Ralph JSON:** `prd.json` in repo root
+- Keep titles, IDs, descriptions, acceptance criteria, and order identical between the markdown stories and JSON entries
+- If an existing `prd.json` belongs to a different feature and `progress.md` has content, archive per runner convention before overwriting
 
-### 9. Open Questions
-Remaining questions or areas needing clarification.
+### Archiving (when feature changes)
+1. Read current `prd.json`
+2. If `branchName` differs and `progress.md` has content beyond its header:
+   - Create `archive/YYYY-MM-DD-[feature-name]/`
+   - Copy `prd.json` and `progress.md` there
+   - Reset `progress.md` header
 
 ---
 
 ## Writing for Junior Developers
 
-The PRD reader may be a junior developer or AI agent. Therefore:
-
-- Be explicit and unambiguous
-- Avoid jargon or explain it
-- Provide enough detail to understand purpose and core logic
-- Number requirements for easy reference
-- Use concrete examples where helpful
+Be explicit, avoid jargon, number requirements, and use concrete examples. Acceptance criteria must be testable, not vague.
 
 ---
 
-## Output
+## Final Checklist (both files must pass)
 
-- **Format:** Markdown (`.md`)
-- **Location:** `tasks/`
-- **Filename:** `NNNN-prd-[feature-name].md` (kebab-case), where `NNNN` is the next zero-padded number
-
----
-
-## Example PRD
-
-```markdown
-# PRD: Task Priority System
-
-## Introduction
-
-Add priority levels to tasks so users can focus on what matters most. Tasks can be marked as high, medium, or low priority, with visual indicators and filtering to help users manage their workload effectively.
-
-## Goals
-
-- Allow assigning priority (high/medium/low) to any task
-- Provide clear visual differentiation between priority levels
-- Enable filtering and sorting by priority
-- Default new tasks to medium priority
-
-## User Stories
-
-### US-001: Add priority field to database
-**Description:** As a developer, I need to store task priority so it persists across sessions.
-
-**Acceptance Criteria:**
-- [ ] Add priority column to tasks table: 'high' | 'medium' | 'low' (default 'medium')
-- [ ] Generate and run migration successfully
-- [ ] Typecheck passes
-
-### US-002: Display priority indicator on task cards
-**Description:** As a user, I want to see task priority at a glance so I know what needs attention first.
-
-**Acceptance Criteria:**
-- [ ] Each task card shows colored priority badge (red=high, yellow=medium, gray=low)
-- [ ] Priority visible without hovering or clicking
-- [ ] Typecheck passes
-- [ ] Verify in browser using dev-browser skill
-
-### US-003: Add priority selector to task edit
-**Description:** As a user, I want to change a task's priority when editing it.
-
-**Acceptance Criteria:**
-- [ ] Priority dropdown in task edit modal
-- [ ] Shows current priority as selected
-- [ ] Saves immediately on selection change
-- [ ] Typecheck passes
-- [ ] Verify in browser using dev-browser skill
-
-### US-004: Filter tasks by priority
-**Description:** As a user, I want to filter the task list to see only high-priority items when I'm focused.
-
-**Acceptance Criteria:**
-- [ ] Filter dropdown with options: All | High | Medium | Low
-- [ ] Filter persists in URL params
-- [ ] Empty state message when no tasks match filter
-- [ ] Typecheck passes
-- [ ] Verify in browser using dev-browser skill
-
-## Functional Requirements
-
-- FR-1: Add `priority` field to tasks table ('high' | 'medium' | 'low', default 'medium')
-- FR-2: Display colored priority badge on each task card
-- FR-3: Include priority selector in task edit modal
-- FR-4: Add priority filter dropdown to task list header
-- FR-5: Sort by priority within each status column (high to medium to low)
-
-## Non-Goals
-
-- No priority-based notifications or reminders
-- No automatic priority assignment based on due date
-- No priority inheritance for subtasks
-
-## Technical Considerations
-
-- Reuse existing badge component with color variants
-- Filter state managed via URL search params
-- Priority stored in database, not computed
-
-## Success Metrics
-
-- Users can change priority in under 2 clicks
-- High-priority tasks immediately visible at top of lists
-- No regression in task list performance
-
-## Open Questions
-
-- Should priority affect task ordering within a column?
-- Should we add keyboard shortcuts for priority changes?
-```
-
----
-
-## Checklist
-
-Before saving the PRD:
-
-- [ ] Asked clarifying questions with lettered options
-- [ ] Incorporated user's answers
-- [ ] User stories are small and specific
-- [ ] Functional requirements are numbered and unambiguous
-- [ ] Non-goals section defines clear boundaries
-- [ ] Saved to `tasks/prd-[feature-name].md`
+- [ ] Clarifying questions asked and answered (lettered options)
+- [ ] Stories are small, ordered by dependency, and mapped 1:1 between markdown and JSON
+- [ ] Every story has verifiable acceptance criteria with required boilerplate lines
+- [ ] Functional requirements are numbered; non-goals set boundaries
+- [ ] Files saved to `tasks/NNNN-prd-[feature].md` and `prd.json` with matching content

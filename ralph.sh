@@ -1,6 +1,7 @@
 #!/bin/bash
 # Ralph Wiggum - Lean AI loop
 # Usage: ./ralph.sh [--tool opencode|amp|claude] [max_iterations]
+# Orchestrates short agent runs driven by prompt.md and prd.json, archiving old runs when the PRD changes.
 
 set -euo pipefail
 
@@ -82,7 +83,7 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   } > "$PROGRESS_FILE"
 fi
 
-# Basic PRD validation: require userStories array with at least one entry
+# Basic PRD validation: require userStories array with at least one entry; skips if jq absent
 if command -v jq >/dev/null 2>&1; then
   if [ ! -f "$PRD_FILE" ]; then
     echo "Missing PRD file at $PRD_FILE" >&2

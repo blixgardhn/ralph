@@ -1,2 +1,2 @@
-Placeholder for PRD skills.
-Add your PRD skill files here so install_ralph_skills.sh can copy them into the OpenCode skills directory.
+PRD + Ralph prd.json skill lives here.
+`SKILL.md` describes generating both a markdown PRD and synchronized `prd.json`.
