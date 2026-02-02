@@ -1,0 +1,17 @@
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PATH="/usr/local/bin:${PATH}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       ca-certificates \
+       curl \
+       bash \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://install.opencode.sh | bash
+
+WORKDIR /app/dest_repo
+
+CMD ["/bin/bash", "-lc", "/app/ralph.sh --tool opencode 10"]
