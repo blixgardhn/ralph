@@ -17,6 +17,7 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 3. Generate the PRD in markdown
 4. Generate the matching `prd.json`
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
+6. Keep tasks minimal and focused; split aggressively so each story fits in one iteration
 
 **Important:** Do NOT implement the feature. Deliver specs only.
 
@@ -110,6 +111,7 @@ Story format:
 - IDs sequential (US-001...), priorities follow order
 - Every story has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI
 - `branchName` = `ralph/[feature-name-kebab-case]`
+ - Default to the smallest viable stories; avoid bundling unrelated work
 
 ---
 
