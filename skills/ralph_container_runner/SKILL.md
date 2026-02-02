@@ -15,7 +15,7 @@ Run the Ralph harness via `docker compose`, mounting the Ralph repo to `/app` (r
 1. Require Docker with Compose available.
 2. From the destination repo, set `RALPH_DEST_REPO="$(pwd)"`, then `cd` to the Ralph repo to run Compose.
 3. Export `RALPH_REPO_HOST_PATH` (absolute path to Ralph repo) and `OPENCODE_CONFIG_PATH` (path to host OpenCode config, e.g., `$HOME/.config/opencode`).
-4. Optionally set `RALPH_RUNNER_IMAGE` (default `ralph-run:local`).
+4. Optionally set `RALPH_RUNNER_IMAGE` (default `ralph-run:local` built from Dockerfile.ralph-run installing opencode via `curl -fsSL https://opencode.ai/install | bash`).
 5. From the Ralph repo root, run `docker compose run --rm ralph-run /bin/bash -lc "/app/ralph.sh [--tool opencode|amp|claude] [max_iterations]"`.
 6. Compose mounts `/app` from `RALPH_REPO_HOST_PATH` (read-only), `/app/dest_repo` from `RALPH_DEST_REPO` (read/write), and OpenCode config from `OPENCODE_CONFIG_PATH` read-only; sets `DEST_REPO=/app/dest_repo`.
 7. Stream output; do not detach. Report command, image used, mounts, exit code.
