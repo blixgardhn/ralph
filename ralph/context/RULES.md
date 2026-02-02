@@ -30,3 +30,5 @@
 ## Tests
 - Add tests when they provide meaningful confidence.
 - Core logic and non-trivial behavior should be covered; prefer fast, deterministic tests over brittle integration tests.
+- Provide seed data that can be loaded into the database on demand.
+- For acceptance tests, always seed the database before running tests.

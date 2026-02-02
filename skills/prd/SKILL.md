@@ -68,6 +68,7 @@ Sections:
 7. Technical Considerations (optional)
 8. Success Metrics
 9. Open Questions
+10. Seed Data — datasets/fixtures needed to run acceptance tests or local flows
 
 Story format:
 ```markdown
@@ -111,7 +112,8 @@ Story format:
 - IDs sequential (US-001...), priorities follow order
 - Every story has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI
 - `branchName` = `ralph/[feature-name-kebab-case]`
- - Default to the smallest viable stories; avoid bundling unrelated work. Only combine tasks when they naturally belong together and stay within a single iteration.
+- Default to the smallest viable stories; avoid bundling unrelated work. Only combine tasks when they naturally belong together and stay within a single iteration.
+- Include seed data requirements when acceptance tests need a preloaded database.
 
 ---
 
