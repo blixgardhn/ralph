@@ -114,6 +114,7 @@ Story format:
 - `branchName` = `ralph/[feature-name-kebab-case]`
 - Default to the smallest viable stories; avoid bundling unrelated work. Only combine tasks when they naturally belong together and stay within a single iteration.
 - Include seed data requirements when acceptance tests need a preloaded database.
+- When generating `prd.json`, actively split into smaller, narrowly scoped tasks to improve focus, testability, and per-iteration success.
 
 ---
 
