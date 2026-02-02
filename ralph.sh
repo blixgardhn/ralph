@@ -6,7 +6,7 @@
 set -euo pipefail
 
 TOOL="opencode"
-MAX_ITERATIONS=20
+MAX_ITERATIONS=30
 PRD_HASH=""
 LAST_PRD_HASH=""
 

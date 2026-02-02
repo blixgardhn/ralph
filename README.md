@@ -106,7 +106,7 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
 ```
 
-Default is 10 iterations. Use `--tool amp` or `--tool claude` to override the default OpenCode tool.
+Default is 30 iterations. Use `--tool amp` or `--tool claude` to override the default OpenCode tool.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
