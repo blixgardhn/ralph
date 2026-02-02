@@ -10,6 +10,9 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 ./ralph.sh [--tool opencode|amp|claude] [max_iterations]
 ```
 
+## Patterns
+- When spinning up test containers, use the smallest base image that matches the stack under test; avoid heavier images when a minimal distro suffices.
+
 ## Key Files
 
 - `ralph.sh` - thin loop runner
