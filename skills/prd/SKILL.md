@@ -18,6 +18,7 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 4. Generate the matching `prd.json`
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
 6. Keep tasks minimal and focused; split aggressively so each story fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one story.
+7. For each user story, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that story.
 
 **Important:** Do NOT implement the feature. Deliver specs only.
 
@@ -96,12 +97,13 @@ Story format:
   "userStories": [
     {
       "id": "US-001",
-      "title": "[Story title]",
-      "description": "As a [user], I want [feature] so that [benefit]",
-      "acceptanceCriteria": ["Criterion 1", "Criterion 2", "Typecheck passes"],
-      "priority": 1,
-      "passes": false,
-      "notes": ""
+  "title": "[Story title]",
+  "description": "As a [user], I want [feature] so that [benefit]",
+  "acceptanceCriteria": ["Criterion 1", "Criterion 2", "Typecheck passes"],
+  "subtasks": ["Subtask 1", "Subtask 2"],
+  "priority": 1,
+  "passes": false,
+  "notes": ""
     }
   ]
 }
@@ -116,6 +118,7 @@ Story format:
 - Default to the smallest viable stories; avoid bundling unrelated work. Only combine tasks when they naturally belong together and stay within a single iteration.
 - Include seed data requirements when acceptance tests need a preloaded database.
 - When generating `prd.json`, actively split into smaller, narrowly scoped tasks to improve focus, testability, and per-iteration success.
+- Add a concise `subtasks` array for each story in `prd.json` mirroring the markdown subtasks; keep them implementation-ready and limited to that story.
 
 ---
 

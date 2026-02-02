@@ -17,6 +17,7 @@ Steps:
 11) If you cannot complete the current story (or unblock missing tools/code) within this iteration, stop immediately and reply `<promise>STOP</promise>` with a brief reason. Do not proceed to any other story.
 12) All code must include inline comments documenting functionality. Every function, complex logic block, and significant code section must have explanatory comments.
 13) README.md must include thorough documentation for how the app works, including setup, usage, architecture, and examples.
+14) Applications must be runnable in a Kubernetes environment; favor container-friendly commands and configs.
 
 Progress log append format (to `progress.md`):
 ```
