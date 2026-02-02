@@ -1,6 +1,6 @@
 ---
 name: prd
-description: "Generate a Product Requirements Document (PRD) and a matching Ralph prd.json. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out, convert to ralph prd.json."
+description: "Default to PRD + prd.json for any change request. Use when planning a feature, starting a project, or whenever the user asks to change code unless they explicitly say to implement without a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out, convert to ralph prd.json, change the code." 
 user-invocable: true
 ---
 
@@ -12,7 +12,7 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 
 ## The Job
 
-1. Receive a feature description
+1. Receive a feature or change request (assume PRD + prd.json is needed unless the user explicitly opts out)
 2. Ask 3-5 essential clarifying questions (lettered options)
 3. Generate the PRD in markdown
 4. Generate the matching `prd.json`
