@@ -15,12 +15,12 @@ Run the Ralph harness via `docker compose`, mounting the Ralph repo to `/app` (r
 1. Require Docker with Compose available.
 2. From the destination repo, set `RALPH_DEST_REPO="$(pwd)"`, then `cd` to the Ralph repo to run Compose.
 3. Export `RALPH_REPO_HOST_PATH` (absolute path to Ralph repo) and `OPENCODE_CONFIG_PATH` (path to host OpenCode config, e.g., `$HOME/.config/opencode`).
-4. Choose a base image per task: set `RALPH_BASE_IMAGE` (e.g., `mcr.microsoft.com/dotnet/sdk:8.0` for .NET, `python:3.12-slim` for Python). `Dockerfile.ralph-run` respects `BASE_IMAGE` via build args; default is `debian:bookworm-slim`.
+4. The skill must choose `RALPH_BASE_IMAGE` based on the destination stack (e.g., `mcr.microsoft.com/dotnet/sdk:8.0` for .NET builds, `python:3.12-slim` for Python, `node:20-slim` for Node); pick the smallest image that fits the task. `Dockerfile.ralph-run` respects `BASE_IMAGE` via build args; default is `debian:bookworm-slim` but should be overridden appropriately.
 5. Optionally set `RALPH_RUNNER_IMAGE` (default `ralph-run:local` built from Dockerfile.ralph-run installing opencode via `curl -fsSL https://opencode.ai/install | bash`).
 6. From the Ralph repo root, run `RALPH_ARGS="--tool opencode 10" RALPH_BASE_IMAGE=<image> docker compose up --build --abort-on-container-exit --force-recreate --remove-orphans`. Use `-d` **only** if you manage cleanup yourself.
 7. Compose mounts `/app` from `RALPH_REPO_HOST_PATH` (read-only), `/app/dest_repo` from `RALPH_DEST_REPO` (read/write), and OpenCode config from `OPENCODE_CONFIG_PATH` read-only; sets `DEST_REPO=/app/dest_repo`.
 8. Cleanup: on exit (including Ctrl-C), run `docker compose down --remove-orphans --volumes` from the Ralph repo to remove all started containers. Always perform this cleanup.
-9. Stream output; do not detach unless you take responsibility for cleanup. Report command, image used, base image, mounts, exit code.
+9. Stream output; do not detach unless you take responsibility for cleanup. Report command, image used, chosen base image, mounts, exit code.
 
 ---
 
