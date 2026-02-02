@@ -6,45 +6,30 @@ user-invocable: true
 
 # Ralph Container Runner
 
-Run the Ralph harness inside a container while mounting the Ralph repo to `/app` and the caller's present working directory to `/app/dest_repo`. This keeps host toolchains clean and ensures Ralph operates against the mounted destination repo using the in-container Ralph files.
+Run the Ralph harness via `docker compose` while mounting the Ralph repo to `/app` and the caller's destination repo to `/app/dest_repo`. This keeps host toolchains clean and ensures Ralph operates against the mounted destination repo using the in-container Ralph files.
 
 ---
 
 ## The Job
 
-1. Determine container runtime (Docker or Podman). Default to Docker; fall back to Podman if Docker is unavailable.
-2. Choose an image: use `$RALPH_RUNNER_IMAGE` if set; otherwise default to `ubuntu:22.04` (caller must ensure `ralph.sh` dependencies are available in the image, e.g., `bash`, `git`, `jq`, AI CLI).
-3. Mount the Ralph repo (this skill's repository root) read-only to `/app`.
-4. Mount the caller's current working directory read/write to `/app/dest_repo`.
-5. Set container working directory to `/app/dest_repo`.
-6. Run `/app/ralph.sh [--tool opencode|amp|claude] [max_iterations]` inside the container shell (`/bin/bash -lc`), with `DEST_REPO=/app/dest_repo` set so Ralph reads/writes `.ralph` under the mounted destination. Pass through any required environment variables for the chosen AI tool (e.g., auth tokens) if the user provides them.
-7. Stream output to the caller; do not detach.
-8. On completion, report the command, image used, runtime (docker/podman), mount points, and exit code.
+1. Require Docker with Compose available.
+2. Set `DEST_REPO_HOST_PATH` to the absolute path of the destination repo on the host; set `RALPH_REPO_HOST_PATH` to the absolute path of the Ralph repo on the host. Export these env vars so Compose can mount them.
+3. Optionally set `RALPH_RUNNER_IMAGE` to override the image (defaults to ubuntu:22.04 in compose file).
+4. From the Ralph repo root, run `docker compose run --rm ralph-run /bin/bash -lc "/app/ralph.sh [--tool opencode|amp|claude] [max_iterations]"`.
+5. Compose mounts `/app` from `RALPH_REPO_HOST_PATH` (read-only) and `/app/dest_repo` from `DEST_REPO_HOST_PATH` (read/write) and sets `DEST_REPO=/app/dest_repo`.
+6. Stream output; do not detach.
+7. On completion, report the command, image used, mount points, and exit code.
 
 ---
 
-## Example Command (Docker)
+## Example Command (Docker Compose)
 
 ```bash
-docker run --rm -it \
-  -v "$(pwd)":/app:ro \
-  -v "${DEST_REPO:-$(pwd)}":/app/dest_repo \
-  -w /app/dest_repo \
-  ${RALPH_RUNNER_IMAGE:-ubuntu:22.04} \
-  -e DEST_REPO=/app/dest_repo \
-  /bin/bash -lc "/app/ralph.sh --tool opencode 10"
-```
+export RALPH_REPO_HOST_PATH="/abs/path/to/ralph-repo"
+export DEST_REPO_HOST_PATH="/abs/path/to/destination-repo"
+export RALPH_RUNNER_IMAGE="ubuntu:22.04" # optional override
 
-## Example Command (Podman)
-
-```bash
-podman run --rm -it \
-  -v "$(pwd)":/app:ro \
-  -v "${DEST_REPO:-$(pwd)}":/app/dest_repo \
-  -w /app/dest_repo \
-  ${RALPH_RUNNER_IMAGE:-ubuntu:22.04} \
-  -e DEST_REPO=/app/dest_repo \
-  /bin/bash -lc "/app/ralph.sh --tool opencode 10"
+docker compose run --rm ralph-run /bin/bash -lc "/app/ralph.sh --tool opencode 10"
 ```
 
 ---
