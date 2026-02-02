@@ -2,10 +2,18 @@ version: "3.9"
 
 services:
   ralph-run:
-    image: ${RALPH_RUNNER_IMAGE:-ubuntu:22.04}
+    # Build from Dockerfile.ralph-run (debian:bookworm-slim base with opencode installed).
+    build:
+      context: .
+      dockerfile: Dockerfile.ralph-run
+    image: ${RALPH_RUNNER_IMAGE:-ralph-run:local}
     working_dir: /app/dest_repo
     environment:
       - DEST_REPO=/app/dest_repo
+      - OPENAI_API_KEY
+      - OPENCODE_API_KEY
+      - ANTHROPIC_API_KEY
+      - OPENROUTER_API_KEY
     entrypoint: ["/bin/bash", "-lc"]
     command: ["/app/ralph.sh --tool opencode 10"]
     volumes:
