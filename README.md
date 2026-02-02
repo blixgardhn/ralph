@@ -123,6 +123,7 @@ Ralph will:
 | File | Purpose |
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool opencode|amp|claude`, default OpenCode) |
+| `ralph.py` | Python wrapper to run `ralph.sh` with DEST_REPO defaulting to the current working directory |
 | `prompt.md` | Prompt template for the AI tool |
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
