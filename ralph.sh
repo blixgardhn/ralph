@@ -36,10 +36,15 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROMPT_FILE="$SCRIPT_DIR/prompt.md"
-PRD_FILE="$SCRIPT_DIR/prd.json"
-PROGRESS_FILE="$SCRIPT_DIR/progress.md"
-ARCHIVE_DIR="$SCRIPT_DIR/archive"
-LAST_PRD_HASH_FILE="$SCRIPT_DIR/.last-prd-hash"
+
+DEST_REPO="${DEST_REPO:-$PWD}"
+METADATA_DIR="$DEST_REPO/.ralph"
+mkdir -p "$METADATA_DIR"
+
+PRD_FILE="$METADATA_DIR/prd.json"
+PROGRESS_FILE="$METADATA_DIR/progress.md"
+ARCHIVE_DIR="$METADATA_DIR/archive"
+LAST_PRD_HASH_FILE="$METADATA_DIR/.last-prd-hash"
 
 if [ ! -f "$PROMPT_FILE" ]; then
   echo "Missing prompt file at $PROMPT_FILE"
@@ -57,9 +62,10 @@ if [ -f "$PRD_FILE" ]; then
       NAME=$(jq -r '.branchName // .project // empty' "$PRD_FILE")
       [ -z "$NAME" ] && NAME="prd"
     fi
+    NAME_SLUG=$(echo "$NAME" | tr '[:space:]' '-' | tr -cs '[:alnum:]._-' '-')
     ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$NAME"
     mkdir -p "$ARCHIVE_FOLDER"
-    cp "$PRD_FILE" "$ARCHIVE_FOLDER/prd.json"
+    cp "$PRD_FILE" "$ARCHIVE_FOLDER/prd-$NAME_SLUG.json"
     [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/progress.md"
     {
       echo "## Codebase Patterns"
@@ -83,7 +89,6 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   } > "$PROGRESS_FILE"
 fi
 
-# Basic PRD validation: require userStories array with at least one entry; skips if jq absent
 if command -v jq >/dev/null 2>&1; then
   if [ ! -f "$PRD_FILE" ]; then
     echo "Missing PRD file at $PRD_FILE" >&2

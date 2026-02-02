@@ -1,0 +1,1 @@
+Run Ralph inside a container, mounting the Ralph repo at `/app` and the caller's destination repo at `/app/dest_repo`. Uses the container's `bash` to invoke `/app/ralph.sh` with the working directory set to `/app/dest_repo` and `DEST_REPO=/app/dest_repo` so `.ralph` metadata is read/written under the mounted destination.

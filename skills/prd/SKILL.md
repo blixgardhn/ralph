@@ -81,6 +81,7 @@ Story format:
 - [ ] Typecheck passes
 - [ ] Tests pass (include when applicable)
 - [ ] Verify in browser using dev-browser skill (UI stories)
+
 ```
 
 ---
@@ -120,10 +121,10 @@ Story format:
 
 ## Step 4: Outputs and Sync
 
-- **Markdown PRD:** `tasks/NNNN-prd-[feature-name].md` (next zero-padded number)
-- **Ralph JSON:** `prd.json` in repo root
+- **Markdown PRD:** `.ralph/tasks/NNNN-prd-[feature-name].md` (next zero-padded number)
+- **Ralph JSON:** `.ralph/prd.json` in repo root
 - Keep titles, IDs, descriptions, acceptance criteria, and order identical between the markdown stories and JSON entries
-- If an existing `prd.json` belongs to a different feature and `progress.md` has content, archive per runner convention before overwriting
+- If an existing `.ralph/prd.json` belongs to a different feature and `.ralph/progress.md` has content, archive per runner convention before overwriting
 
 ### Archiving (when feature changes)
 1. Read current `prd.json`
@@ -146,4 +147,4 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 - [ ] Stories are small, ordered by dependency, and mapped 1:1 between markdown and JSON
 - [ ] Every story has verifiable acceptance criteria with required boilerplate lines
 - [ ] Functional requirements are numbered; non-goals set boundaries
-- [ ] Files saved to `tasks/NNNN-prd-[feature].md` and `prd.json` with matching content
+- [ ] Files saved to `.ralph/tasks/NNNN-prd-[feature].md` and `.ralph/prd.json` with matching content
