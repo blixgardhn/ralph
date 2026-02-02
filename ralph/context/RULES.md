@@ -18,7 +18,7 @@
 - Provide telemetry and tracing when suitable for the domain.
 
 ## Runtime environment
-- Run development, dependency installation, linting, testing, and builds inside containers; keep the host environment untouched.
+- Run development, dependency installation, linting, testing, builds, and diagnostics inside containers; keep the host environment untouched.
 - Place a `Dockerfile` in each project when appropriate; multiple Dockerfiles are allowed.
 
 ## Repository layout
