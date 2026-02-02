@@ -1,0 +1,1 @@
+Run Ralph (`./ralph.sh`) from the Ralph repo, pointing at a destination repo via `DEST_REPO=/abs/path`. Requires the destination path to exist; no files are copied. Accepts optional `--tool` and iteration count.
