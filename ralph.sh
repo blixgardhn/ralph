@@ -118,6 +118,14 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     OUTPUT=$(opencode run "$PROMPT_TEXT" 2>&1 | tee /dev/stderr) || true
   fi
 
+  # If all stories are done, prompt final full test sweep
+  if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
+    REMAINING=$(jq '[.userStories[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo 0)
+    if [ "$REMAINING" -eq 0 ]; then
+      echo "All stories marked done; rerun full test suite before finish." >&2
+    fi
+  fi
+
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
     echo "Ralph completed all tasks at iteration $i."

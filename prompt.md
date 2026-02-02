@@ -8,8 +8,8 @@ Steps:
 3) Pick the highest-priority story with `passes: false`.
 4) If `userStories` is empty or malformed, stop and log the issue instead of claiming completion.
 4) Work only on that story.
-5) If the story touches code, run required checks (lint/test/typecheck) using project commands; prefer containerized entrypoints if available.
-6) Always run tests (or the nearest equivalent validation) before finishing the story; record the command and result.
+5) If the story touches code, run the smallest relevant checks first (targeted tests/lint/typecheck) using project commands; prefer containerized entrypoints if available.
+6) Always run tests (or the nearest equivalent validation) before finishing the story; record the command and result. When this story finishes the PRD (all stories will be passes: true), rerun the full system test suite before replying.
 7) Do not install host toolchains.
 8) Do not commit.
 9) Update `prd.json` to mark the story `passes: true` when done.
