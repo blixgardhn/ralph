@@ -11,9 +11,9 @@ Steps:
 5) If the story touches code, run the smallest relevant checks first (targeted tests/lint/typecheck) using project commands; prefer containerized entrypoints if available.
 6) Always run tests (or the nearest equivalent validation) before finishing the story; record the command and result. When this story finishes the PRD (all stories will be passes: true), rerun the full system test suite before replying.
 7) Do not install host toolchains.
-8) Do not commit.
-9) Update `prd.json` to mark the story `passes: true` when done.
-10) Append a concise but rich log to `progress.md`.
+8) Update `prd.json` to mark the story `passes: true` when done.
+9) Append a concise but rich log to `progress.md`.
+10) Commit all changes for this story (include updated prd.json/progress.md) with a clear message naming the story ID, then push.
 11) If you cannot complete the current story (or unblock missing tools/code) within this iteration, stop immediately and reply `<promise>STOP</promise>` with a brief reason. Do not proceed to any other story.
 
 Progress log append format (to `progress.md`):
@@ -28,6 +28,5 @@ Progress log append format (to `progress.md`):
 Constraints:
 - Keep changes minimal and focused; no extra refactors.
 - Avoid loading unrelated large files; read what you need to implement and validate.
-- Never commit or push; leave the tree staged/unstaged as appropriate.
 - If required tools/entrypoints/tests or code gaps block progress, prioritize fixing or creating them immediately before proceeding with the story; log what you did.
 - Stop after one story.
