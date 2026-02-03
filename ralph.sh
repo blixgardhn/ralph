@@ -10,6 +10,8 @@ MAX_ITERATIONS=30
 PRD_HASH=""
 LAST_PRD_HASH=""
 
+DEST_REPO_ARG=""
+
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -23,10 +25,12 @@ parse_args() {
         ;;
       --dest-repo)
         DEST_REPO="$2"
+        DEST_REPO_ARG="$2"
         shift 2
         ;;
       --dest-repo=*)
         DEST_REPO="${1#*=}"
+        DEST_REPO_ARG="${1#*=}"
         shift
         ;;
       *)
@@ -51,7 +55,16 @@ set_paths() {
   PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 
   local dest_root
-  dest_root="${DEST_REPO:-${dest_repo:-$PWD}}"
+  if [ -n "$DEST_REPO_ARG" ]; then
+    dest_root="$DEST_REPO_ARG"
+  elif [ -n "${DEST_REPO:-}" ]; then
+    dest_root="$DEST_REPO"
+  elif [ -n "${dest_repo:-}" ]; then
+    dest_root="$dest_repo"
+  else
+    dest_root="$PWD"
+  fi
+
   if ! DEST_REPO="$(cd "$dest_root" 2>/dev/null && pwd)"; then
     echo "DEST_REPO path is invalid: $dest_root" >&2
     exit 1
