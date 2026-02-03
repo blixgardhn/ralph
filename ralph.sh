@@ -65,6 +65,11 @@ set_paths() {
     dest_root="$PWD"
   fi
 
+  if [ -z "$dest_root" ]; then
+    echo "DEST_REPO is empty; specify --dest-repo or set DEST_REPO." >&2
+    exit 1
+  fi
+
   if ! DEST_REPO="$(cd "$dest_root" 2>/dev/null && pwd)"; then
     echo "DEST_REPO path is invalid: $dest_root" >&2
     exit 1
