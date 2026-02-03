@@ -1,5 +1,8 @@
 # Rules (General)
 
+## Scope
+- These rules apply by default; language-specific rules override where applicable.
+
 ## Language
 - Code, comments, commit messages, and documentation must be in English.
 
@@ -19,17 +22,20 @@
 
 ## Runtime environment
 - Run development, dependency installation, linting, testing, builds, and diagnostics inside containers; keep the host environment untouched.
-- Place a `Dockerfile` in each project when appropriate; multiple Dockerfiles are allowed.
-- Always provide a `docker-compose` setup that lets developers run and test the whole project locally.
+- Provide a containerized entrypoint (Dockerfile and/or Compose) appropriate to the repository.
 - When running the software (any service/app), run it in a container unless explicitly stated otherwise.
+- When running code generation that requires tooling, use a container based on a base image appropriate to the task.
 
 ## Repository layout
-- Application source code lives under `src/` at the repository root.
-- Do not place application code in the repository root or unrelated directories.
-- Configuration, documentation, and automation scripts may live outside `src/`.
+- Follow best practices for the relevant language and type of project when choosing code location and layout.
+- Configuration, documentation, and automation scripts may live outside application code directories.
+
+## Docs
+- Update README only when user-facing behavior changes.
 
 ## Tests
 - Add tests when they provide meaningful confidence.
 - Core logic and non-trivial behavior should be covered; prefer fast, deterministic tests over brittle integration tests.
 - Provide seed data that can be loaded into the database on demand.
 - For acceptance tests, always seed the database before running tests.
+- Run targeted tests at minimum; run the full suite when the PRD is complete.

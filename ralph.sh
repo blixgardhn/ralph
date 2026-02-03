@@ -7,10 +7,10 @@ set -euo pipefail
 
 TOOL="opencode"
 MAX_ITERATIONS=30
-PRD_HASH=""
-LAST_PRD_HASH=""
+RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
+TARGET_REPO_ROOT="" # target repo root where code will be generated
 
-DEST_REPO_ARG=""
+TARGET_REPO_ARG=""
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -23,14 +23,14 @@ parse_args() {
         TOOL="${1#*=}"
         shift
         ;;
-      --dest-repo)
-        DEST_REPO="$2"
-        DEST_REPO_ARG="$2"
+      --target-repo)
+        TARGET_REPO="$2"
+        TARGET_REPO_ARG="$2"
         shift 2
         ;;
-      --dest-repo=*)
-        DEST_REPO="${1#*=}"
-        DEST_REPO_ARG="${1#*=}"
+      --target-repo=*)
+        TARGET_REPO="${1#*=}"
+        TARGET_REPO_ARG="${1#*=}"
         shift
         ;;
       *)
@@ -43,6 +43,9 @@ parse_args() {
   done
 }
 
+# shellcheck source=./prd_utils.sh
+source "$RALPH_ROOT/prd_utils.sh"
+
 validate_tool() {
   if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
     echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'opencode'."
@@ -51,111 +54,42 @@ validate_tool() {
 }
 
 set_paths() {
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  PROMPT_FILE="$SCRIPT_DIR/prompt.md"
+  PROMPT_FILE="$RALPH_ROOT/prompt.md"
 
-  local dest_repo_input
-  if [ -n "$DEST_REPO_ARG" ]; then
-    dest_repo_input="$DEST_REPO_ARG"
-  elif [ -n "${DEST_REPO:-}" ]; then
-    dest_repo_input="$DEST_REPO"
-  elif [ -n "${dest_repo:-}" ]; then
-    dest_repo_input="$dest_repo"
+  local target_repo_input
+  if [ -n "$TARGET_REPO_ARG" ]; then
+    target_repo_input="$TARGET_REPO_ARG"
+  elif [ -n "${TARGET_REPO:-}" ]; then
+    target_repo_input="$TARGET_REPO"
+  elif [ -n "${target_repo:-}" ]; then
+    target_repo_input="$target_repo"
   else
-    dest_repo_input="$PWD"
+    target_repo_input="$PWD"
   fi
 
-  if [ -z "$dest_repo_input" ]; then
-    echo "DEST_REPO is empty; specify --dest-repo or set DEST_REPO." >&2
+  if [ -z "$target_repo_input" ]; then
+    echo "TARGET_REPO is empty; specify --target-repo or set TARGET_REPO." >&2
     exit 1
   fi
 
-  if ! DEST_REPO="$(cd "$dest_repo_input" 2>/dev/null && pwd)"; then
-    echo "DEST_REPO path is invalid: $dest_repo_input" >&2
+  if ! TARGET_REPO="$(cd "$target_repo_input" 2>/dev/null && pwd)"; then
+    echo "TARGET_REPO path is invalid: $target_repo_input" >&2
     exit 1
   fi
 
-  METADATA_DIR="$DEST_REPO/.ralph"
-  mkdir -p "$METADATA_DIR"
+  if [ "$TARGET_REPO" = "$RALPH_ROOT" ]; then
+    echo "TARGET_REPO must not be the Ralph root; point to the target repo containing .ralph." >&2
+    exit 1
+  fi
 
-  PRD_FILE="$METADATA_DIR/prd.json"
-  PROGRESS_FILE="$METADATA_DIR/progress.md"
-  ARCHIVE_DIR="$METADATA_DIR/archive"
-  LAST_PRD_HASH_FILE="$METADATA_DIR/.last-prd-hash"
+  TARGET_REPO_ROOT="$TARGET_REPO"
+
+  configure_prd_paths "$TARGET_REPO_ROOT"
 }
 
 require_prompt() {
   if [ ! -f "$PROMPT_FILE" ]; then
     echo "Missing prompt file at $PROMPT_FILE"
-    exit 1
-  fi
-}
-
-archive_prd_if_changed() {
-  if [ ! -f "$PRD_FILE" ]; then
-    return
-  fi
-
-  PRD_HASH=$(sha1sum "$PRD_FILE" | awk '{print $1}')
-  [ -f "$LAST_PRD_HASH_FILE" ] && LAST_PRD_HASH=$(cat "$LAST_PRD_HASH_FILE" || true)
-
-  if [ -n "$LAST_PRD_HASH" ] && [ "$PRD_HASH" != "$LAST_PRD_HASH" ]; then
-    DATE=$(date +%Y-%m-%d)
-    NAME="prd"
-    if command -v jq >/dev/null 2>&1; then
-      NAME=$(jq -r '.branchName // .project // empty' "$PRD_FILE")
-      [ -z "$NAME" ] && NAME="prd"
-    fi
-    NAME_SLUG=$(echo "$NAME" | tr '[:space:]' '-' | tr -cs '[:alnum:]._-' '-')
-    ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$NAME"
-    mkdir -p "$ARCHIVE_FOLDER"
-    cp "$PRD_FILE" "$ARCHIVE_FOLDER/prd-$NAME_SLUG.json"
-    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/progress.md"
-    {
-      echo "## Codebase Patterns"
-      echo ""
-      echo "# Ralph Progress Log"
-      echo "Started: $(date)"
-      echo "---"
-    } > "$PROGRESS_FILE"
-  fi
-
-  echo "$PRD_HASH" > "$LAST_PRD_HASH_FILE"
-}
-
-init_progress_file() {
-  if [ -f "$PROGRESS_FILE" ]; then
-    return
-  fi
-
-  {
-    echo "## Codebase Patterns"
-    echo ""
-    echo "# Ralph Progress Log"
-    echo "Started: $(date)"
-    echo "---"
-  } > "$PROGRESS_FILE"
-}
-
-validate_prd() {
-  if ! command -v jq >/dev/null 2>&1; then
-    return
-  fi
-
-  if [ ! -f "$PRD_FILE" ]; then
-    echo "Missing PRD file at $PRD_FILE" >&2
-    exit 1
-  fi
-
-  STORY_COUNT=$(jq '.userStories | length' "$PRD_FILE" 2>/dev/null || echo 0)
-  if [ "$STORY_COUNT" -eq 0 ]; then
-    echo "PRD has no userStories; add stories before running Ralph." >&2
-    exit 1
-  fi
-
-  MISSING_FIELDS=$(jq -r '.userStories[] | select((.id? | type != "string") or (.title? | type != "string") or (.passes? | type != "boolean")) | .id // "<no id>"' "$PRD_FILE" 2>/dev/null || true)
-  if [ -n "$MISSING_FIELDS" ]; then
-    echo "PRD has stories missing required fields (id/title/passes). Offending IDs: $MISSING_FIELDS" >&2
     exit 1
   fi
 }
@@ -214,6 +148,7 @@ main() {
   parse_args "$@"
   validate_tool
   set_paths
+  require_prd_file
   require_prompt
   archive_prd_if_changed
   init_progress_file

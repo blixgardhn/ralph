@@ -7,7 +7,7 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 ## Command
 
 ```bash
-./ralph.sh [--tool opencode|amp|claude] [max_iterations]
+./ralph.sh [--tool opencode|amp|claude] [--target-repo path] [max_iterations]
 ```
 
 ## Patterns
@@ -19,14 +19,16 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 - `prompt.md` - instructions for the agent
 - `prd.json.example` - PRD format example
 
-## Patterns
+## Guidelines
 
 - Keep iterations small; one story per run
 - Prefer containerized tooling; avoid host installs
-- Append progress to `progress.md`; keep `Codebase Patterns` concise but useful
+- Append progress to `.ralph/progress.md`; keep `Codebase Patterns` concise but useful
 - Update `prd.json` `passes` when a story is finished
 - Logs live in `progress.md` only: note key files/functions, commands run (including tests), outcomes, follow-ups
-- For each completed story: commit all changes (including prd.json and progress.md) with a clear story-specific message and push
+- For each completed story: commit all changes (including prd.json and progress.md) with a clear story-specific message; push only when explicitly requested
 - If required tools/entrypoints/tests or blocking code gaps exist, fix or create them first, then proceed with the story
 - If a story cannot be completed (or unblocked) in the iteration, stop and exit without moving to another story
+- Run targeted checks at minimum; run the full suite when finishing the PRD
+- Update README only when user-facing behavior changes
 - When running the software (any service/app), do so in a container unless explicitly told otherwise

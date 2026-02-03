@@ -59,7 +59,7 @@ Users can reply with codes like "1A, 2C, 3B".
 
 Sections:
 1. Introduction/Overview — the feature and problem it solves
-2. Goals — measurable objectives
+2. Goals — specific, measurable objectives
 3. User Stories — each story must be one focused iteration
    - Title, Description ("As a [user], I want [feature] so that [benefit]"), Acceptance Criteria
    - UI stories also require: "Verify in browser using dev-browser skill"
@@ -83,8 +83,11 @@ Story format:
 - [ ] Typecheck passes
 - [ ] Tests pass (include when applicable)
 - [ ] Verify in browser using dev-browser skill (UI stories)
-
 ```
+**Important:**
+
+* Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
+* For any story with UI changes: Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
 
 ---
 
@@ -128,6 +131,7 @@ Story format:
 - **Markdown PRD:** `.ralph/tasks/NNNN-prd-[feature-name].md` (next zero-padded number)
 - **Ralph JSON:** `.ralph/prd.json` in repo root
 - Keep titles, IDs, descriptions, acceptance criteria, and order identical between the markdown stories and JSON entries
+- When new requirements arrive before all existing `userStories` have `passes: true`, append the new stories to both files and preserve all unfinished stories and their current `passes` values; do not rewrite or drop unpassed stories
 - If an existing `.ralph/prd.json` belongs to a different feature and `.ralph/progress.md` has content, archive per runner convention before overwriting
 
 ### Archiving (when feature changes)

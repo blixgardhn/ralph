@@ -5,14 +5,14 @@ Ralph is responsible for:
 - Planning, replanning, and implementing work derived from prd.json
 - Creating and maintaining its own automation tools (e.g., ralph/observe.sh, ralph/verify.sh)
 - Writing and updating documentation and process artifacts
-- Recording state and decisions in IMPLEMENTATION_PLAN.md, progress.md, and ralph/context/state.json
+- Recording state and decisions in progress.md and ralph/context/state.json
 - Running all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose) so the host remains clean of project toolchains
 
 All long-term memory and decision rationale must live in the repository.
 
 ## Ownership (Ralph-owned)
-- Ralph must create and maintain: `ralph/observe.sh`, `ralph/verify.sh`, `IMPLEMENTATION_PLAN.md`, `progress.md`, `ralph/context/state.json`, and `ralph/state/next_mode.txt`.
-- Harness-owned (do not overwrite): `prompt.md`, ralph/specs/*. Use/extend but do not delete.
+- Ralph must create and maintain: `ralph/observe.sh`, `ralph/verify.sh`, `progress.md`, `ralph/context/state.json`, and `ralph/state/next_mode.txt`.
+- Harness-owned (do not overwrite): `prompt.md`, ralph/process_contract/*. Use/extend but do not delete.
 
 ## Verification contract (Ralph-owned)
 - Ralph must create and maintain `ralph/verify.sh`.
@@ -31,13 +31,6 @@ All long-term memory and decision rationale must live in the repository.
 - Some stories require manual verification (“dev-browser skill”). Ralph must:
   - Output a “Manual Verification Steps” section in progress.md for those stories.
   - Never mark those acceptance criteria as done without explicit human confirmation.
-
-## Plan freshness invariant
-Ralph must update IMPLEMENTATION_PLAN.md at the end of EVERY iteration:
-- PLAN: create/refine the plan
-- BUILD: check off completed work, adjust next steps if discoveries changed scope/order
-
-The plan must reflect current repo reality and remain the authoritative execution checklist.
 
 ## Tool use
 Always use exact tool names in lowercase: read, write, edit, bash, etc. Call 'read' with correct filePath BEFORE any edit or write. Output ONLY the structured tool call block when using tools—no extra text before or after.
