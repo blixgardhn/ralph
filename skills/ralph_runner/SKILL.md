@@ -1,51 +1,30 @@
 ---
 name: ralph_runner
-description: "Run ralph.sh from the Ralph repo against a destination repo path. Triggers on: run ralph here, run ralph against, run ralph with dest, execute ralph." 
+description: "Run ../ralph/ralph.sh against the current repo without copying runner files. Triggers on: run ralph here, execute ralph, run ralph against this repo."
 user-invocable: true
 ---
 
-# Ralph Runner (Remote Destination)
+# Ralph Runner (sibling checkout)
 
-Execute `ralph.sh` from the Ralph repo while pointing it at a destination repo provided as an argument.
+Run Ralph from a sibling checkout (`../ralph`) against the current repo. Use when you are already at the target repo root and want Ralph to generate code there without importing/committing the runner files.
 
----
+## Preconditions
 
-## The Job
+- The Ralph repo is checked out at `../ralph` relative to the target repo root.
+- `../ralph/ralph.sh` exists and is executable; it depends on `prompt.md` in the same directory.
+- Do **not** copy or stage files from `../ralph` into the target repo. Only target-repo changes (including `.ralph/*` outputs) may be staged/committed.
 
-1. Require a destination repo path argument; resolve to an absolute path and verify it exists.
-2. Set `DEST_REPO` to that path before invoking `ralph.sh` from the Ralph repo root.
-3. Do not copy files; run in-place from the Ralph repo. Do not modify files in the Ralph repo—metadata, progress, and archives must stay under `DEST_REPO/.ralph`.
-4. Preserve tool selection and iteration args; accept optional `--tool` and max iterations.
-5. Stream output; do not detach. Report command, tool, destination path, and exit code.
-6. Do not install host toolchains; if needed, instruct the user to run the containerized runner instead.
+## How to Run
 
----
+1) Stay at the target repo root (the repo you want to modify).
+2) Run Ralph with the sibling runner:
+   ```bash
+   DEST_REPO="$PWD" ../ralph/ralph.sh --tool opencode 1
+   ```
+   - Replace `1` to change max iterations if needed.
+   - Pass `--tool amp` or `--tool claude` to switch tools.
 
-## Usage
+## Notes
 
-```bash
-# From Ralph repo root
-export DEST_REPO=/abs/path/to/destination
-./ralph.sh --tool opencode 10
-
-# Or provide dest inline
-DEST_REPO=/abs/path/to/destination ./ralph.sh --tool opencode 10
-```
-
-To run against another path without env export:
-
-```bash
-DEST_REPO="/abs/path/to/destination" ./ralph.sh --tool claude 5
-```
-
----
-
-## Output
-
-Summarize:
-- Tool used and iterations
-- Destination path
-- Command executed
-- Exit code
-
-Do not modify files outside the destination repo.
+- Ralph writes metadata to `.ralph/` inside the target repo (e.g., `prd.json`, `progress.md`). These are safe to stage/commit if desired; do **not** add anything from `../ralph`.
+- If `../ralph` is missing, stop and ask for the path to the Ralph checkout instead of copying files.

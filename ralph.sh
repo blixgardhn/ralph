@@ -21,6 +21,14 @@ parse_args() {
         TOOL="${1#*=}"
         shift
         ;;
+      --dest-repo)
+        DEST_REPO="$2"
+        shift 2
+        ;;
+      --dest-repo=*)
+        DEST_REPO="${1#*=}"
+        shift
+        ;;
       *)
         if [[ "$1" =~ ^[0-9]+$ ]]; then
           MAX_ITERATIONS="$1"
@@ -42,7 +50,13 @@ set_paths() {
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 
-  DEST_REPO="${DEST_REPO:-$PWD}"
+  local dest_root
+  dest_root="${DEST_REPO:-${dest_repo:-$PWD}}"
+  if ! DEST_REPO="$(cd "$dest_root" 2>/dev/null && pwd)"; then
+    echo "DEST_REPO path is invalid: $dest_root" >&2
+    exit 1
+  fi
+
   METADATA_DIR="$DEST_REPO/.ralph"
   mkdir -p "$METADATA_DIR"
 
@@ -143,7 +157,7 @@ run_iteration() {
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$PROMPT_FILE" 2>&1 | tee >(cat >&2)) || true
   else
     PROMPT_TEXT="$(cat "$PROMPT_FILE")"
-    OUTPUT$(opencode run "$PROMPT_TEXT" 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(opencode run "$PROMPT_TEXT" 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
