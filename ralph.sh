@@ -54,24 +54,24 @@ set_paths() {
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   PROMPT_FILE="$SCRIPT_DIR/prompt.md"
 
-  local dest_root
+  local dest_repo_input
   if [ -n "$DEST_REPO_ARG" ]; then
-    dest_root="$DEST_REPO_ARG"
+    dest_repo_input="$DEST_REPO_ARG"
   elif [ -n "${DEST_REPO:-}" ]; then
-    dest_root="$DEST_REPO"
+    dest_repo_input="$DEST_REPO"
   elif [ -n "${dest_repo:-}" ]; then
-    dest_root="$dest_repo"
+    dest_repo_input="$dest_repo"
   else
-    dest_root="$PWD"
+    dest_repo_input="$PWD"
   fi
 
-  if [ -z "$dest_root" ]; then
+  if [ -z "$dest_repo_input" ]; then
     echo "DEST_REPO is empty; specify --dest-repo or set DEST_REPO." >&2
     exit 1
   fi
 
-  if ! DEST_REPO="$(cd "$dest_root" 2>/dev/null && pwd)"; then
-    echo "DEST_REPO path is invalid: $dest_root" >&2
+  if ! DEST_REPO="$(cd "$dest_repo_input" 2>/dev/null && pwd)"; then
+    echo "DEST_REPO path is invalid: $dest_repo_input" >&2
     exit 1
   fi
 
