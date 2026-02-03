@@ -24,7 +24,7 @@ All long-term memory and decision rationale must live in the repository.
 - verify.sh must print clear step banners.
 
 ## Branching and commits
-- Each task/story should use a feature branch (e.g., `ralph/<StoryID>`). Do not work directly on main/master.
+ - Each task/story must use a dedicated feature branch (e.g., `ralph/<StoryID>`); never commit directly to main/master, and commit to that feature branch at the end of every iteration.
 - Commit only after verification passes (containerized checks). No WIP commits.
 
 ## Browser verification
