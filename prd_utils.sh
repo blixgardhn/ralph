@@ -2,6 +2,13 @@
 
 # PRD and progress handling utilities for Ralph.
 
+# Initialize globals to avoid unbound variable errors when sourced under `set -u`.
+METADATA_DIR=""
+PRD_FILE=""
+PROGRESS_FILE=""
+ARCHIVE_DIR=""
+LAST_PRD_HASH_FILE=""
+
 configure_prd_paths() {
   local target_root="$1"
 
@@ -26,8 +33,8 @@ archive_prd_if_changed() {
     return
   fi
 
-  local prd_hash
-  local last_prd_hash
+  local prd_hash=""
+  local last_prd_hash=""
 
   prd_hash=$(sha1sum "$PRD_FILE" | awk '{print $1}')
   [ -f "$LAST_PRD_HASH_FILE" ] && last_prd_hash=$(cat "$LAST_PRD_HASH_FILE" || true)
