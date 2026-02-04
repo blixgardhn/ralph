@@ -94,6 +94,107 @@ require_prompt() {
   fi
 }
 
+enforce_feature_branch() {
+  if ! command -v git >/dev/null 2>&1; then
+    echo "[Ralph] Branch enforcement failed: git not installed." >&2
+    exit 1
+  fi
+
+  if [ ! -d "$TARGET_REPO_ROOT/.git" ]; then
+    echo "[Ralph] Branch enforcement failed: $TARGET_REPO_ROOT is not a git repo." >&2
+    exit 1
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "[Ralph] Branch enforcement failed: jq not installed to read branchName from PRD." >&2
+    exit 1
+  fi
+
+  local prd_branch
+  prd_branch=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || true)
+
+  if [ -z "$prd_branch" ]; then
+    echo "[Ralph] PRD missing branchName; set a feature branch (e.g., ralph/<story-id>)." >&2
+    exit 1
+  fi
+
+  if [ "$prd_branch" = "main" ] || [ "$prd_branch" = "master" ]; then
+    echo "[Ralph] PRD branchName cannot be main/master; use a dedicated feature branch." >&2
+    exit 1
+  fi
+
+  local current_branch
+  current_branch=$(cd "$TARGET_REPO_ROOT" && git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+
+  if [ "$current_branch" = "$prd_branch" ]; then
+    return 0
+  fi
+
+  if git -C "$TARGET_REPO_ROOT" switch "$prd_branch" >/dev/null 2>&1; then
+    echo "[Ralph] Switched to branch '$prd_branch' to match PRD." >&2
+    return 0
+  fi
+
+  if git -C "$TARGET_REPO_ROOT" switch -c "$prd_branch" >/dev/null 2>&1; then
+    echo "[Ralph] Created and switched to branch '$prd_branch' from current HEAD." >&2
+    return 0
+  fi
+
+  echo "[Ralph] Could not switch to or create branch '$prd_branch'." >&2
+  echo "Try manually: git -C \"$TARGET_REPO_ROOT\" switch '$prd_branch' || git -C \"$TARGET_REPO_ROOT\" switch -c '$prd_branch'" >&2
+  exit 1
+}
+
+announce_story_selection() {
+  local iteration="$1"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "[Ralph] Story selection skipped (jq not installed)." >&2
+    return 0
+  fi
+
+  if [ ! -f "$PRD_FILE" ]; then
+    echo "[Ralph] Story selection skipped (missing PRD at $PRD_FILE)." >&2
+    return 0
+  fi
+
+  local story_json
+  story_json=$(jq '(.userStories // []) | map(select(.passes != true)) | sort_by((.priority // 2147483647), .id) | .[0]' "$PRD_FILE" 2>/dev/null || true)
+
+  if [ -z "$story_json" ] || [ "$story_json" = "null" ]; then
+    echo "[Ralph] No pending stories to pick." >&2
+    return 0
+  fi
+
+  local story_id story_title story_description
+  story_id=$(echo "$story_json" | jq -r '.id // "<no id>"')
+  story_title=$(echo "$story_json" | jq -r '.title // "<no title>"')
+  story_description=$(echo "$story_json" | jq -r '.description // "<no description>"')
+
+  local selection_block
+  selection_block=$(cat <<EOF
+>>> Story Selection (iteration $iteration)
+ID: $story_id
+Title: $story_title
+Description: $story_description
+EOF
+)
+
+  echo "$selection_block"
+
+  if [ -n "$PROGRESS_FILE" ]; then
+    {
+      echo "## $(date --iso-8601=seconds) - Story selection (iteration $iteration)"
+      echo "- ID: $story_id"
+      echo "- Title: $story_title"
+      echo "- Description: $story_description"
+      echo "---"
+    } >> "$PROGRESS_FILE"
+  fi
+
+  return 0
+}
+
 run_iteration() {
   local iteration="$1"
 
@@ -101,6 +202,8 @@ run_iteration() {
   echo "==============================================================="
   echo "  Ralph Iteration $iteration of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
+
+  announce_story_selection "$iteration"
 
   local OUTPUT
   if [[ "$TOOL" == "amp" ]]; then
@@ -150,6 +253,7 @@ main() {
   set_paths
   require_prd_file
   require_prompt
+  enforce_feature_branch
   archive_prd_if_changed
   init_progress_file
   validate_prd
