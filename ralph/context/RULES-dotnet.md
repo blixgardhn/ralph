@@ -19,7 +19,7 @@ See `RULES.md` for shared guidance (language, development style, safety, observa
 - Reusable code may be placed in library projects within the solution.
 
 ### Restore/build prerequisites
-- `dotnet restore`/`dotnet build` require the repo-root `nuget.config`; without it the private feed is unreachable and builds will fail.
+- `dotnet restore`/`dotnet build` require the repo-root `ralph/nuget.config`; without it the private feed is unreachable and builds will fail.
 - Ensure the sources in `nuget.config` are available during restore (e.g., mount the file and pass through network access in containers/CI) or the restore will fail.
 - The private feed credentials come from the host `NUGET_API_KEY`; ensure it is available to the `dotnet` command (export locally or pass through to containers/tooling).
 - Do not commit credentials or edit `nuget.config` values—only supply the key via environment variables.

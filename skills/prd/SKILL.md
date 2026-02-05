@@ -114,15 +114,16 @@ Story format:
 ```
 
 ### Conversion and Sizing Rules
-- Each story must fit in one Ralph iteration; split big items
-- Order by dependencies: schema → backend → UI → summaries
-- IDs sequential (US-001...), priorities follow order
-- Every story has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI
-- `branchName` = `ralph/[feature-name-kebab-case]`
-- Default to the smallest viable stories; avoid bundling unrelated work. Only combine tasks when they naturally belong together and stay within a single iteration.
-- Include seed data requirements when acceptance tests need a preloaded database.
-- When generating `prd.json`, actively split into smaller, narrowly scoped tasks to improve focus, testability, and per-iteration success.
-- Add a concise `subtasks` array for each story in `prd.json` mirroring the markdown subtasks; keep them implementation-ready and limited to that story.
+- Target 6–10 stories for a typical feature; never fewer than 4 unless the feature is truly tiny.
+- Each story must fit in one Ralph iteration (~1–2 hours). If it needs backend + UI + docs, split.
+- Split by dependency order: schema → backend/service/API → UI → validation/edge cases → docs/ops.
+- If a story spans multiple boundaries (DB + API + UI) or has >4 acceptance criteria, split it.
+- Schema+UI in one story is not allowed—separate data changes from presentation changes.
+- IDs sequential (US-001...), priorities follow order.
+- Every story has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI.
+- `branchName` = `ralph/[feature-name-kebab-case]`.
+- Include seed data requirements when acceptance tests need preloaded data.
+- `subtasks`: every story lists 3–6 actionable subtasks scoped to that story only; if you cannot do that without crossing boundaries, split again.
 
 ---
 

@@ -4,7 +4,7 @@ You are a single-iteration coding agent. Do exactly one highest-priority story f
 
 Steps:
 - Read `.ralph/prd.json` and `.ralph/progress.md`. Do not fetch or read any other files unless required for the chosen story. If stories are missing/malformed, stop and log. If all `passes: true`, reply `<promise>COMPLETE</promise>`. Otherwise pick the highest-priority `passes: false` story and work only on it.
-- Run checks in the smallest matching container: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `mcr.microsoft.com/dotnet/sdk`, `node:20`, `python:3.11`). For .NET, mount the runner `nuget.config` (`-v "$RALPH_ROOT/nuget.config":/root/.nuget/NuGet/NuGet.Config:ro`) and pass `-e NUGET_API_KEY`. Avoid host toolchains.
+- Run checks in the smallest matching container: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `mcr.microsoft.com/dotnet/sdk`, `node:20`, `python:3.11`). For .NET, mount the runner `nuget.config` (`-v "$RALPH_ROOT/ralph/nuget.config":/root/.nuget/NuGet/NuGet.Config:ro`) and pass `-e NUGET_API_KEY`. Avoid host toolchains.
 - Before finishing, run targeted validation; when this story completes the PRD, rerun the full suite. Record commands/results.
 - Mark the story `passes: true` in `.ralph/prd.json`; append the log entry to `.ralph/progress.md`; commit all story changes (including PRD/progress) with the story ID. Push only when asked.
 - If you cannot finish or unblock within this iteration, reply `<promise>STOP</promise>` with a brief reason—do not move to another story.
