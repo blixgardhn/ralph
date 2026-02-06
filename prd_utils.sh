@@ -12,13 +12,19 @@ LAST_PRD_HASH_FILE=""
 
 configure_prd_paths() {
   local target_root="$1"
+  local suggestions_root="${2:-$target_root}"
 
   METADATA_DIR="$target_root/.ralph"
   mkdir -p "$METADATA_DIR"
 
   PRD_FILE="$METADATA_DIR/prd.json"
   PROGRESS_FILE="$METADATA_DIR/progress.md"
-  SUGGESTIONS_FILE="$METADATA_DIR/suggested_improvements.md"
+
+  local suggestions_dir
+  suggestions_dir="$suggestions_root/.ralph"
+  mkdir -p "$suggestions_dir"
+  SUGGESTIONS_FILE="$suggestions_dir/suggested_improvements.md"
+
   ARCHIVE_DIR="$METADATA_DIR/archive"
   LAST_PRD_HASH_FILE="$METADATA_DIR/.last-prd-hash"
 }
@@ -37,9 +43,20 @@ archive_prd_if_changed() {
 
   local prd_hash=""
   local last_prd_hash=""
+  local unfinished_count=""
 
   prd_hash=$(sha1sum "$PRD_FILE" | awk '{print $1}')
   [ -f "$LAST_PRD_HASH_FILE" ] && last_prd_hash=$(cat "$LAST_PRD_HASH_FILE" || true)
+
+  if command -v jq >/dev/null 2>&1; then
+    unfinished_count=$(jq '[.userStories[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo "")
+  fi
+
+  if [ -n "$unfinished_count" ] && [ "$unfinished_count" -gt 0 ]; then
+    echo "[Ralph] Skipping PRD archive: $unfinished_count unfinished stories remain." >&2
+    echo "$prd_hash" > "$LAST_PRD_HASH_FILE"
+    return
+  fi
 
   if [ -n "$last_prd_hash" ] && [ "$prd_hash" != "$last_prd_hash" ]; then
     local date name name_slug archive_folder
@@ -55,7 +72,7 @@ archive_prd_if_changed() {
     mkdir -p "$archive_folder"
     cp "$PRD_FILE" "$archive_folder/prd-$name_slug.json"
     [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$archive_folder/progress.md"
-    [ -f "$SUGGESTIONS_FILE" ] && cp "$SUGGESTIONS_FILE" "$archive_folder/suggested_improvements.md"
+    # Do not archive suggestions when they live outside the target repo; they stay in the runner.
     {
       echo "## Codebase Patterns"
       echo ""
@@ -63,11 +80,6 @@ archive_prd_if_changed() {
       echo "Started: $(date)"
       echo "---"
     } > "$PROGRESS_FILE"
-    {
-      echo "# Suggested Improvements"
-      echo "Notes captured after each Ralph iteration; implement separately."
-      echo "---"
-    } > "$SUGGESTIONS_FILE"
   fi
 
   echo "$prd_hash" > "$LAST_PRD_HASH_FILE"
@@ -88,6 +100,10 @@ init_progress_file() {
 }
 
 init_suggestions_file() {
+  if [ -z "$SUGGESTIONS_FILE" ]; then
+    return
+  fi
+
   if [ -f "$SUGGESTIONS_FILE" ]; then
     return
   fi

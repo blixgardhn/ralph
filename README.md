@@ -116,7 +116,7 @@ Ralph will:
 5. Commit if checks pass
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.md`
-8. Append improvement suggestions to `suggested_improvements.md` (only when concrete learnings exist)
+8. Append improvement suggestions to the Ralph runner’s `.ralph/suggested_improvements.md` (only when concrete learnings exist; keep them out of the target repo)
 9. Repeat until all stories pass or max iterations reached
 
 ## Key Files
@@ -128,7 +128,7 @@ Ralph will:
 | `prd.json` | User stories with `passes` status (the task list) |
 | `prd.json.example` | Example PRD format for reference |
 | `progress.md` | Append-only learnings for future iterations |
-| `suggested_improvements.md` | Suggestions logged after each iteration to refine the loop |
+| `suggested_improvements.md` | Suggestions logged after each iteration to refine the loop (lives in the Ralph runner repo) |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph_prd/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 

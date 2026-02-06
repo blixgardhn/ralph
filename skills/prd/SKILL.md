@@ -133,7 +133,8 @@ Story format:
 - **Ralph JSON:** `.ralph/prd.json` in repo root
 - Keep titles, IDs, descriptions, acceptance criteria, and order identical between the markdown stories and JSON entries
 - When new requirements arrive before all existing `userStories` have `passes: true`, append the new stories to both files and preserve all unfinished stories and their current `passes` values; do not rewrite or drop unpassed stories
-- If an existing `.ralph/prd.json` belongs to a different feature and `.ralph/progress.md` has content, archive per runner convention before overwriting
+- If any `passes: false` stories exist, do not archive the current `.ralph/prd.json`; instead, append new tasks to it so unfinished work remains
+- If an existing `.ralph/prd.json` belongs to a different feature and `.ralph/progress.md` has content, archive per runner convention before overwriting (only when all stories have `passes: true`)
 
 ### Archiving (when feature changes)
 1. Read current `prd.json`

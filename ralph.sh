@@ -84,7 +84,8 @@ set_paths() {
 
   TARGET_REPO_ROOT="$TARGET_REPO"
 
-  configure_prd_paths "$TARGET_REPO_ROOT"
+  # Suggestions stay with the Ralph runner so they do not modify the target repo.
+  configure_prd_paths "$TARGET_REPO_ROOT" "$RALPH_ROOT"
 }
 
 require_prompt() {
