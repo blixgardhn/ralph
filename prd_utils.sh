@@ -6,6 +6,7 @@
 METADATA_DIR=""
 PRD_FILE=""
 PROGRESS_FILE=""
+SUGGESTIONS_FILE=""
 ARCHIVE_DIR=""
 LAST_PRD_HASH_FILE=""
 
@@ -17,6 +18,7 @@ configure_prd_paths() {
 
   PRD_FILE="$METADATA_DIR/prd.json"
   PROGRESS_FILE="$METADATA_DIR/progress.md"
+  SUGGESTIONS_FILE="$METADATA_DIR/suggested_improvements.md"
   ARCHIVE_DIR="$METADATA_DIR/archive"
   LAST_PRD_HASH_FILE="$METADATA_DIR/.last-prd-hash"
 }
@@ -53,6 +55,7 @@ archive_prd_if_changed() {
     mkdir -p "$archive_folder"
     cp "$PRD_FILE" "$archive_folder/prd-$name_slug.json"
     [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$archive_folder/progress.md"
+    [ -f "$SUGGESTIONS_FILE" ] && cp "$SUGGESTIONS_FILE" "$archive_folder/suggested_improvements.md"
     {
       echo "## Codebase Patterns"
       echo ""
@@ -60,6 +63,11 @@ archive_prd_if_changed() {
       echo "Started: $(date)"
       echo "---"
     } > "$PROGRESS_FILE"
+    {
+      echo "# Suggested Improvements"
+      echo "Notes captured after each Ralph iteration; implement separately."
+      echo "---"
+    } > "$SUGGESTIONS_FILE"
   fi
 
   echo "$prd_hash" > "$LAST_PRD_HASH_FILE"
@@ -77,6 +85,60 @@ init_progress_file() {
     echo "Started: $(date)"
     echo "---"
   } > "$PROGRESS_FILE"
+}
+
+init_suggestions_file() {
+  if [ -f "$SUGGESTIONS_FILE" ]; then
+    return
+  fi
+
+  {
+    echo "# Suggested Improvements"
+    echo "Notes captured after each Ralph iteration; implement separately."
+    echo "---"
+  } > "$SUGGESTIONS_FILE"
+}
+
+append_suggestion_entry() {
+  local iteration="$1"
+  local outcome="$2"
+  local detail="$3"
+
+  if [ -z "$SUGGESTIONS_FILE" ]; then
+    return
+  fi
+
+  {
+    echo "## $(date --iso-8601=seconds) - Iteration $iteration ($outcome)"
+    echo "- $detail"
+    echo "---"
+  } >> "$SUGGESTIONS_FILE"
+}
+
+# Extract actionable suggestions from an iteration output and append only if present.
+# Heuristics look for lines containing "suggestion:" or "improvement:" (case-insensitive)
+# and capture bullet-style or sentence entries.
+record_suggestions() {
+  local iteration="$1"
+  local outcome="$2"
+  local output="$3"
+
+  if [ -z "$output" ]; then
+    return
+  fi
+
+  # Collect unique suggestion lines.
+  local suggestions
+  suggestions=$(printf '%s\n' "$output" | grep -i -E 'suggestion:|improvement:' | sed 's/^[-*]\s*//g' | sed 's/^\s*//g' | sort -u)
+
+  if [ -z "$suggestions" ]; then
+    return
+  fi
+
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    append_suggestion_entry "$iteration" "$outcome" "$line"
+  done <<< "$suggestions"
 }
 
 validate_prd() {

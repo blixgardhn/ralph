@@ -225,15 +225,18 @@ run_iteration() {
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
     echo "Ralph completed all tasks at iteration $iteration."
+    record_suggestions "$iteration" "complete" "$OUTPUT"
     exit 0
   fi
 
   if echo "$OUTPUT" | grep -q "<promise>STOP</promise>"; then
     echo ""
     echo "Ralph requested stop at iteration $iteration."
+    record_suggestions "$iteration" "stopped" "$OUTPUT"
     exit 0
   fi
 
+  record_suggestions "$iteration" "continued" "$OUTPUT"
   echo "Iteration $iteration finished; continuing..."
 }
 
@@ -256,6 +259,7 @@ main() {
   enforce_feature_branch
   archive_prd_if_changed
   init_progress_file
+  init_suggestions_file
   validate_prd
   run_iterations
 }
