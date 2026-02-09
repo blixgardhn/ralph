@@ -83,6 +83,8 @@ Load the prd skill and create a PRD for [your feature description]
 
 Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
 
+Before finalizing, take a high-level pass across all user stories: make sure they fit together, reorder them if dependencies or narrative flow suggest a better sequence, and promote any oversized subtasks into standalone stories, then re-run the overview and ordering.
+
 ### 2. Convert PRD to Ralph format
 
 Use the Ralph skill to convert the markdown PRD to JSON:
@@ -92,6 +94,19 @@ Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
 ```
 
 This creates `prd.json` with user stories structured for autonomous execution.
+
+### Quick start (minimal example)
+
+```bash
+# 1) Create PRD (interactive, uses prd skill)
+Load the prd skill and create a PRD for "[your feature description]"
+
+# 2) Convert to prd.json (ralph_prd skill)
+Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+
+# 3) Run Ralph against your project repo
+./ralph.sh --target-repo /path/to/your/repo
+```
 
 ### 3. Run Ralph
 

@@ -256,6 +256,9 @@ main() {
   validate_tool
   set_paths
   require_prd_file
+  if [ -x "$RALPH_ROOT/scripts/check_prd.sh" ]; then
+    PRD_FILE="$PRD_FILE" "$RALPH_ROOT/scripts/check_prd.sh"
+  fi
   require_prompt
   enforce_feature_branch
   archive_prd_if_changed
