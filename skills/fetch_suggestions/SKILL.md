@@ -3,6 +3,11 @@ description: "List suggested improvements from sibling repos' .ralph/suggested_i
 user-invocable: true
 ---
 
+title: Fetch Suggested Improvements
+summary: Collects and prints suggested improvements from sibling repositories' .ralph/suggested_improvements.md files (read-only)
+usage: "Run from the Ralph runner; scans sibling repos next to it"
+
+
 # Fetch Suggested Improvements
 
 Purpose: From the Ralph runner repo, collect and display suggested improvements from `.ralph/suggested_improvements.md` in sibling repositories that share the same parent directory as the runner.
