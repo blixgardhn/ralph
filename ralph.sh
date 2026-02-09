@@ -54,6 +54,9 @@ validate_tool() {
 }
 
 set_paths() {
+  local invocation_pwd
+  invocation_pwd="$PWD"
+
   PROMPT_FILE="$RALPH_ROOT/prompt.md"
 
   local target_repo_input
@@ -64,7 +67,7 @@ set_paths() {
   elif [ -n "${target_repo:-}" ]; then
     target_repo_input="$target_repo"
   else
-    target_repo_input="$PWD"
+    target_repo_input="$invocation_pwd"
   fi
 
   if [ -z "$target_repo_input" ]; then

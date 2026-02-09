@@ -25,6 +25,7 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 - Keep iterations small; one story per run
 - Prefer containerized tooling; avoid host installs
 - Always run Ralph against a target repo (never the runner itself); set --target-repo explicitly when invoking from the runner.
+- If --target-repo is omitted, Ralph uses the invocation working directory; ensure you run from inside the intended target repo and not from the runner directory.
 - Append progress to `.ralph/progress.md`; keep `Codebase Patterns` concise but useful
 - Update `prd.json` `passes` when a story is finished
 - Logs live in `progress.md` only: note key files/functions, commands run (including tests), outcomes, follow-ups
