@@ -12,7 +12,6 @@ LAST_PRD_HASH_FILE=""
 
 configure_prd_paths() {
   local target_root="$1"
-  local suggestions_root="${2:-$target_root}"
 
   METADATA_DIR="$target_root/.ralph"
   mkdir -p "$METADATA_DIR"
@@ -20,11 +19,7 @@ configure_prd_paths() {
   PRD_FILE="$METADATA_DIR/prd.json"
   PROGRESS_FILE="$METADATA_DIR/progress.md"
 
-  local suggestions_dir
-  suggestions_dir="$suggestions_root/.ralph"
-  mkdir -p "$suggestions_dir"
-  SUGGESTIONS_FILE="$suggestions_dir/suggested_improvements.md"
-
+  SUGGESTIONS_FILE="$METADATA_DIR/suggested_improvements.md"
   ARCHIVE_DIR="$METADATA_DIR/archive"
   LAST_PRD_HASH_FILE="$METADATA_DIR/.last-prd-hash"
 }
