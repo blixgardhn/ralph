@@ -10,7 +10,7 @@ usage: "Run from the Ralph runner; scans sibling repos next to it"
 
 # Fetch Suggested Improvements
 
-Purpose: From the Ralph runner repo, collect and display suggested improvements from `.ralph/suggested_improvements.md` in sibling repositories that share the same parent directory as the runner.
+Purpose: From the Ralph runner repo, collect and display suggested improvements from `.ralph/suggested_improvements.md` in sibling repositories that share the same parent directory as the runner. Each target repo now stores its own suggestions in its `.ralph/` directory.
 
 ## Behavior
 
