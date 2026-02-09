@@ -77,10 +77,13 @@ set_paths() {
     exit 1
   fi
 
-  if [ "$TARGET_REPO" = "$RALPH_ROOT" ]; then
-    echo "TARGET_REPO must not be the Ralph root; point to the target repo containing .ralph." >&2
-    exit 1
-  fi
+  case "$TARGET_REPO" in
+    "$RALPH_ROOT"|"$RALPH_ROOT"/*)
+      echo "TARGET_REPO must not be the Ralph runner directory; point to the target repo containing .ralph." >&2
+      echo "Resolved target: $TARGET_REPO" >&2
+      exit 1
+      ;;
+  esac
 
   TARGET_REPO_ROOT="$TARGET_REPO"
 
