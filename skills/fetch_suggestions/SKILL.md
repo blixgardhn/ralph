@@ -25,7 +25,7 @@ Purpose: From the Ralph runner repo, collect and display suggested improvements 
 ## Output Format
 
 - For each found file: show path and its content (or a brief summary if long). Keep it readable for CLI copy/paste.
-- If none found: "No suggested improvements found in sibling repos." 
+- If none found: "No suggested improvements found in sibling repos."
 
 ## Notes
 
