@@ -12,6 +12,7 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 
 ## Patterns
 - When spinning up test containers, use the smallest base image that matches the stack under test; avoid heavier images when a minimal distro suffices.
+- For images that need outbound network access, include the certificate install RUN block from `ralph/Dockerfile.dotnet`/`ralph/Dockerfile.template` to ensure proxy/interception certs are trusted.
 
 ## Key Files
 
