@@ -15,7 +15,6 @@
         "Generate and run migration successfully",
         "Typecheck passes via containerized tooling only"
       ],
-      "priority": 1,
       "passes": false,
       "notes": ""
     },
@@ -29,7 +28,6 @@
         "Typecheck passes via containerized tooling only",
         "Verify in browser using dev-browser skill"
       ],
-      "priority": 2,
       "passes": false,
       "notes": ""
     },
@@ -44,7 +42,6 @@
         "Typecheck passes via containerized tooling only",
         "Verify in browser using dev-browser skill"
       ],
-      "priority": 3,
       "passes": false,
       "notes": ""
     },
@@ -59,7 +56,6 @@
         "Typecheck passes via containerized tooling only",
         "Verify in browser using dev-browser skill"
       ],
-      "priority": 4,
       "passes": false,
       "notes": ""
     }
