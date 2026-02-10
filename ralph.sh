@@ -218,7 +218,7 @@ run_iteration() {
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$PROMPT_FILE" 2>&1 | tee >(cat >&2)) || true
   else
     PROMPT_TEXT="$(cat "$PROMPT_FILE")"
-    OUTPUT=$(printf "%s" "$PROMPT_TEXT" | opencode run --max-turns 1 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(printf "%s" "$PROMPT_TEXT" | opencode run --no-input 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
