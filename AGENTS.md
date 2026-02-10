@@ -11,9 +11,8 @@ Ralph (`ralph.sh`) orchestrates a loop of fresh, single-iteration agent runs unt
 ```
 
 ## Patterns
-- When spinning up test containers, use the smallest base image that matches the stack under test; avoid heavier images when a minimal distro suffices.
-- For images that need outbound network access, include the certificate install RUN block from `ralph/Dockerfile.dotnet`/`ralph/Dockerfile.template` to ensure proxy/interception certs are trusted.
-- For images that need outbound network access, include the certificate install RUN block from `ralph/resources/Dockerfile.dotnet`/`ralph/resources/Dockerfile.template` to ensure proxy/interception certs are trusted.
+ - When spinning up test containers, use the smallest base image that matches the stack under test; avoid heavier images when a minimal distro suffices.
+ - For images that need outbound network access, include the certificate install RUN block from `ralph/resources/Dockerfile.dotnet`/`ralph/resources/Dockerfile.template` to ensure proxy/interception certs are trusted.
 
 ## Key Files
 
