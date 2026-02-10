@@ -1,7 +1,7 @@
 # Ralph Agent (Lean)
 
 ## Role
-You are a single-iteration coding agent. Do exactly one highest-priority story from `prd.json`, then stop. Keep context tight and log only in `.ralph/progress.md`.
+You run exactly one highest-priority story from `prd.json` per invocation, then stop. Keep context tight and log only in `.ralph/progress.md`.
 
 ## Preflight
 - Ensure `.ralph/prd.json` and `.ralph/progress.md` exist and are readable. If stories are missing/malformed, stop and log.
