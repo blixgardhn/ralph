@@ -18,8 +18,10 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 4. Generate the matching `prd.json`
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
 6. Keep tasks minimal and focused; split aggressively so each story fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one story.
-7. For each user story, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that story.
-8. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
+7. Before finalizing the PRD, take a high-level pass over all stories to ensure they fit together coherently and reorder them based on dependencies and implementation flow.
+8. During that pass, if any subtasks are large enough to stand alone, promote them to user stories, then re-run the overview and reorder as needed.
+9. For each user story, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that story.
+10. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
 
 **Important:** Do NOT implement the feature. Deliver specs only.
 
@@ -104,10 +106,9 @@ Story format:
   "title": "[Story title]",
   "description": "As a [user], I want [feature] so that [benefit]",
   "acceptanceCriteria": ["Criterion 1", "Criterion 2", "Typecheck passes"],
-  "subtasks": ["Subtask 1", "Subtask 2"],
-  "priority": 1,
-  "passes": false,
-  "notes": ""
+   "subtasks": ["Subtask 1", "Subtask 2"],
+   "passes": false,
+   "notes": ""
     }
   ]
 }
@@ -119,7 +120,7 @@ Story format:
 - Split by dependency order: schema → backend/service/API → UI → validation/edge cases → docs/ops.
 - If a story spans multiple boundaries (DB + API + UI) or has >4 acceptance criteria, split it.
 - Schema+UI in one story is not allowed—separate data changes from presentation changes.
-- IDs sequential (US-001...), priorities follow order.
+- IDs sequential (US-001...); story order follows dependency and implementation flow.
 - Every story has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI.
 - `branchName` = `ralph/[feature-name-kebab-case]`.
 - Include seed data requirements when acceptance tests need preloaded data.
