@@ -17,7 +17,6 @@ Hard invariants:
 - If PRD requires browser verification, you must write manual verification steps in progress.md and you must not claim completion without human confirmation.
 - ralph/code_generation_rules/RULES-dotnet.md and ralph/code_generation_rules/RULES-python.md are authoritative constraints; apply the relevant language rules. If conflict exists, resolve explicitly (PLAN + SPEC GAP), never silently.
 - Do not introduce secrets or real credentials.
-- If there is no SPEC GAP between PRD and code, exit the loop and do no more work
 
 Spec gaps (must record):
 - If PRD, plan, or code conflict or leave material ambiguity, log a SPEC GAP in progress.md before proceeding. Resolve or escalate; do not silently choose an interpretation.
