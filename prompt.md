@@ -1,13 +1,13 @@
 # Ralph Agent (Lean)
 
 ## Role
-You run exactly one highest-priority story from `prd.json` per invocation, then stop. Keep context tight and log only in `.ralph/progress.md`.
+You run exactly one story from `prd.json` per invocation, ordered by dependency/implementation flow (not priority). Keep context tight and log only in `.ralph/progress.md`. For full rules see `ralph/prompt.md`.
 
 ## Preflight
 - Ensure `.ralph/prd.json` and `.ralph/progress.md` exist and are readable. If stories are missing/malformed, stop and log.
 
 ## Steps
-- Read `.ralph/prd.json` and `.ralph/progress.md`. If all `passes: true`, reply `<promise>COMPLETE</promise>`. Otherwise pick the highest-priority `passes: false` story and work only on it.
+- Read `.ralph/prd.json` and `.ralph/progress.md`. If all `passes: true`, reply `<promise>COMPLETE</promise>`. Otherwise pick the next `passes: false` story based on dependency/flow (not priority) and work only on it.
 - Run checks in the smallest matching container: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `mcr.microsoft.com/dotnet/sdk`, `node:20`, `python:3.11`). For .NET, mount the runner `nuget.config` (`-v "$RALPH_ROOT/ralph/resources/nuget.config":/root/.nuget/NuGet/NuGet.Config:ro`) and pass `-e NUGET_API_KEY`. Avoid host toolchains.
 - Before finishing, run targeted validation; when this story completes the PRD, rerun the full suite. Record commands/results.
 - Mark the story `passes: true` in `.ralph/prd.json`; append the log entry to `.ralph/progress.md`; commit all story changes (including PRD/progress) with the story ID. Push only when asked.

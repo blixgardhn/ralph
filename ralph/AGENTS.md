@@ -28,3 +28,4 @@ ralph/code_generation_rules/RULES-dotnet.md and ralph/code_generation_rules/RULE
 
 ## Container mandate
 - All installs/tests/builds/seeding run in containers (Docker/Podman/Compose); never install toolchains on host. Prefer `docker compose run <svc> <cmd>` patterns.
+- Prefer prebuilt runtime images to avoid pull/build delays; allow overriding the image/tag when invoking.

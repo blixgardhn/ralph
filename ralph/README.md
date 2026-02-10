@@ -1,15 +1,13 @@
-## Dockerfiles
+## Ralph Runner Internals
 
-- `resources/Dockerfile.dotnet` remains the .NET image and includes the required certificate install RUN block.
-- `resources/Dockerfile.template` is a generalized template: supply `BASE_IMAGE` (e.g., `python:3.11-slim`, `node:20-bullseye`, `mcr.microsoft.com/dotnet/sdk:8.0`). The RUN block is identical to `Dockerfile.dotnet` for certificate install and OpenCode/bootstrap steps.
+- Core prompts and instructions live here: see `ralph/prompt.md` and `ralph/AGENTS.md`.
+- Code generation rules live in `ralph/code_generation_rules/`.
+- Runtime resources (Dockerfiles, nuget.config) are under `ralph/resources/`.
 
-Example builds:
+### verify.sh
 
-```bash
-# .NET (default)
-docker build -f ralph/resources/Dockerfile.dotnet -t ralph-dotnet .
+- `ralph/verify.sh` supports `VERIFY_FAST=true` for minimal checks (per stack) and a full mode by default. It prints step banners and timings. Extend per project to include lint/type/test/format as needed.
 
-# Custom base image using the template
-docker build -f ralph/resources/Dockerfile.template --build-arg BASE_IMAGE=python:3.11-slim -t ralph-python .
-docker build -f ralph/resources/Dockerfile.template --build-arg BASE_IMAGE=node:20-bullseye -t ralph-node .
-```
+### Cache warming
+
+- Use `scripts/warm_caches.sh` to pre-create a Docker volume cache (`CACHE_VOL`) and pre-pull the runtime image (`IMAGE`).

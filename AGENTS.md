@@ -14,7 +14,7 @@ Ralph (`ralph.sh`) orchestrates a loop of fresh, single-iteration agent runs unt
 
 ## Key Files
 - `ralph.sh` — loop runner
-- `prompt.md` — iteration instructions
+- `prompt.md` — iteration instructions (see ralph/prompt.md for full content)
 - `prd.json.example` — PRD format example
 
 ## Guidelines
