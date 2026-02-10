@@ -7,7 +7,7 @@ set -euo pipefail
 
 TOOL="opencode"
 MAX_ITERATIONS=30
-OPENCODE_MODEL="${OPENCODE_MODEL:-opencode/gpt-4o-mini}"
+OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 TARGET_REPO_ROOT="" # target repo root where code will be generated
 
