@@ -10,7 +10,7 @@ Ralph (`ralph.sh`) orchestrates a loop of fresh, single-iteration agent runs unt
 
 ## Patterns
 - Use the smallest base image matching the stack under test; avoid heavy images.
-- For images needing outbound access, include the cert-install RUN block from `ralph/resources/Dockerfile.dotnet` or `ralph/resources/Dockerfile.template`.
+- For images needing outbound access, include the cert-install RUN block from `ralph/resources/Dockerfile.dotnet` or `ralph/resources/Dockerfile.template`. Do not link directly to runner files; copy the needed content into the target project because that code cannot access runner-only resources (they are not secret).
 
 ## Key Files
 - `ralph.sh` — loop runner
