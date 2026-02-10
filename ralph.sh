@@ -262,7 +262,7 @@ main() {
   set_paths
   require_prd_file
   if [ -x "$RALPH_ROOT/scripts/check_prd.sh" ]; then
-    PRD_FILE="$PRD_FILE" "$RALPH_ROOT/scripts/check_prd.sh"
+    PRD_FILE="$PRD_FILE" SUGGESTIONS_FILE="$SUGGESTIONS_FILE" PROGRESS_FILE="$PROGRESS_FILE" ALLOW_CREATE_SUGGESTIONS=true "$RALPH_ROOT/scripts/check_prd.sh"
   fi
   require_prompt
   enforce_feature_branch

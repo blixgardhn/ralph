@@ -1,0 +1,25 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+RUN set -e; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends bash curl ca-certificates git; \
+    echo "Installing proxy certificate for internal build..."; \
+    echo "***********************************************"; \
+    cd /usr/local/share/ca-certificates; \
+    curl -O "http://pki.example.com/proxy/proxy.cer"; \
+    curl -O "http://pki.example.com/chain/IssuingCA.pem.cer"; \
+    curl -O "http://pki.example.com/chain/RootCA.pem.cer"; \
+    mv proxy.cer proxy.crt; \
+    mv "IssuingCA.pem.cer" "IssuingCA.pem.crt"; \
+    mv RootCA.pem.cer RootCA.pem.crt; \
+    update-ca-certificates; \
+    echo "=== Proxy certificate installed successfully ==="; \
+    rm -rf /var/lib/apt/lists/*; \
+    curl -fsSL https://opencode.ai/install | bash; \
+    useradd -m -d /home/opencode opencode; \
+    mkdir -p /home/opencode/.config/opencode; \
+    chown -R opencode:opencode /home/opencode
+
+USER opencode
+WORKDIR /app

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Lean loop to run a single-iteration agent until PRD stories are done. Progress is tracked only in `progress.md`.
+Ralph (`ralph.sh`) orchestrates a loop of fresh, single-iteration agent runs until PRD stories are done; the runner itself is not single-iteration. Progress is tracked only in `progress.md`.
 
 ## Command
 
@@ -13,6 +13,7 @@ Lean loop to run a single-iteration agent until PRD stories are done. Progress i
 ## Patterns
 - When spinning up test containers, use the smallest base image that matches the stack under test; avoid heavier images when a minimal distro suffices.
 - For images that need outbound network access, include the certificate install RUN block from `ralph/Dockerfile.dotnet`/`ralph/Dockerfile.template` to ensure proxy/interception certs are trusted.
+- For images that need outbound network access, include the certificate install RUN block from `ralph/resources/Dockerfile.dotnet`/`ralph/resources/Dockerfile.template` to ensure proxy/interception certs are trusted.
 
 ## Key Files
 
