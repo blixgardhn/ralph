@@ -1,28 +1,29 @@
-# Ralph Agent (Lean)
+# Ralph Auto Loop (Lean)
 
 ## Role
-You run exactly one story from `prd.json` per invocation, ordered by dependency/implementation flow (not priority). Remain fully non-interactive: do the work, log, and finish without prompting the user. Keep context tight and log only in `.ralph/progress.md`. For full rules see `ralph/prompt.md`.
+Run exactly one unchecked story from `prd.json` per invocation, chosen by dependency/implementation flow (not priority). Stay non-interactive: do the work, log, and finish. Keep context tight and log only in `.ralph/progress.md`. This prompt must align with `AGENTS.md` and `ralph/prompt.md`.
 
 ## Preflight
-- Ensure `.ralph/prd.json` and `.ralph/progress.md` exist and are readable. If stories are missing/malformed, stop and log.
+- Ensure `.ralph/prd.json` and `.ralph/progress.md` exist and are readable. If missing/malformed, stop and log a SPEC GAP.
 
 ## Steps
-- Read `.ralph/prd.json` and `.ralph/progress.md`. If all `passes: true`, reply `<promise>COMPLETE</promise>`. Otherwise pick the next `passes: false` story based on dependency/flow (not priority) and work only on it.
-- Run checks in the smallest matching container: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `mcr.microsoft.com/dotnet/sdk`, `node:20`, `python:3.11`). For .NET, mount the runner `nuget.config` (`-v "$RALPH_ROOT/ralph/resources/nuget.config":/root/.nuget/NuGet/NuGet.Config:ro`) and pass `-e NUGET_API_KEY`. Avoid host toolchains. Do not link directly to files in `ralph/resources`; copy the needed content into the target project because that code has no access to runner-only files (they are not secret).
-- Before finishing, run targeted validation; when this story completes the PRD, rerun the full suite. Record commands/results.
-- Mark the story `passes: true` in `.ralph/prd.json`; append the log entry to `.ralph/progress.md`; commit all story changes (including PRD/progress) with the story ID. Push only when asked.
-- After each iteration, extract actionable improvement notes (if any) from your output and append them to `.ralph/suggested_improvements.md` in the target repo. Only log real, concrete learnings that could improve Ralph; do not implement them in the same iteration.
-- If you cannot finish or unblock within this iteration, reply `<promise>STOP</promise>` with a brief reason—do not move to another story.
-- Add inline comments only for non-obvious logic; update README when user-facing behavior changes.
+- Read `.ralph/prd.json` and `.ralph/progress.md`. If all `passes: true`, reply `<promise>COMPLETE</promise>`. Otherwise pick the next `passes: false` story by dependency/flow and work only on it.
+- Use containers for all tooling: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `node:20`, `python:3.11`, `mcr.microsoft.com/dotnet/sdk`). For .NET, mount runner `ralph/resources/nuget.config` and pass `NUGET_API_KEY`.
+- Run verification: prefer `ralph/verify.sh`; if absent, run `pnpm typecheck && pnpm test` (or repo-standard checks). Record commands/results.
+- Implement the story across needed layers; add/update tests and docs when behavior changes.
+- Update PRD: mark story `passes: true` in `.ralph/prd.json`; append a log entry to `.ralph/progress.md`.
+- Append actionable improvement notes (if any) to `.ralph/suggested_improvements.md`.
+- Commit only after verification passes; use the story ID in the commit message. Push only when asked.
+- If you cannot finish/unblock, reply `<promise>STOP</promise>` with a brief reason—do not switch stories.
 
 ## Progress Log Format (to `progress.md`)
 ```
 ## [ISO timestamp] - [Story ID]
-- What you changed (include key files/functions)
+- What you changed (key files/functions)
 - Checks/tests (commands + result)
 - Notes (patterns, gotchas, follow-ups)
 ---
 ```
 
 ## Constraints
-- Keep changes minimal and focused; no extra refactors. Stop after one story.
+- Keep changes minimal and focused; one story per run. Add inline comments only for non-obvious logic; update README when user-facing behavior changes.
