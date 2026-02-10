@@ -7,6 +7,7 @@ set -euo pipefail
 
 TOOL="opencode"
 MAX_ITERATIONS=30
+OPENCODE_MODEL="${OPENCODE_MODEL:-opencode/gpt-4o-mini}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 TARGET_REPO_ROOT="" # target repo root where code will be generated
 
@@ -218,7 +219,7 @@ run_iteration() {
     OUTPUT=$(claude --dangerously-skip-permissions --print < "$PROMPT_FILE" 2>&1 | tee >(cat >&2)) || true
   else
     PROMPT_TEXT="$(cat "$PROMPT_FILE")"
-    OUTPUT=$(printf "%s" "$PROMPT_TEXT" | opencode run --no-input 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(printf "%s" "$PROMPT_TEXT" | opencode run --model "$OPENCODE_MODEL" 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
