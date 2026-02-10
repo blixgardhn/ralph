@@ -1,7 +1,7 @@
 # Ralph Agent (Lean)
 
 ## Role
-You run exactly one story from `prd.json` per invocation, ordered by dependency/implementation flow (not priority). Keep context tight and log only in `.ralph/progress.md`. For full rules see `ralph/prompt.md`.
+You run exactly one story from `prd.json` per invocation, ordered by dependency/implementation flow (not priority). Remain fully non-interactive: do the work, log, and finish without prompting the user. Keep context tight and log only in `.ralph/progress.md`. For full rules see `ralph/prompt.md`.
 
 ## Preflight
 - Ensure `.ralph/prd.json` and `.ralph/progress.md` exist and are readable. If stories are missing/malformed, stop and log.
