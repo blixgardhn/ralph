@@ -15,7 +15,7 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 1. Receive a feature or change request (assume PRD + prd.json is needed unless the user explicitly opts out)
 2. Ask 3-5 essential clarifying questions (lettered options)
 3. Generate the PRD in markdown
-4. Generate the matching `prd.json`
+4. Generate the matching `prd.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow)
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
 6. Keep tasks minimal and focused; split aggressively so each story fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one story.
 7. Before finalizing the PRD, take a high-level pass over all stories to ensure they fit together coherently and reorder them based on dependencies and implementation flow.
@@ -140,7 +140,7 @@ Story format:
 - Split by dependency order: schema → backend/service/API → UI → validation/edge cases → docs/ops.
 - If a story spans multiple boundaries (DB + API + UI) or has >4 acceptance criteria, split it.
 - Schema+UI in one story is not allowed—separate data changes from presentation changes.
-- IDs sequential (US-001...); story order follows dependency and implementation flow.
+- IDs sequential (US-001...); story order follows dependency and implementation flow. Do not add priority fields—selection happens at runtime based on dependencies/flow.
 - Every story has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI.
 - `branchName` = `ralph/[feature-name-kebab-case]`.
 - Include seed data requirements when acceptance tests need preloaded data.
