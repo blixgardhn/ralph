@@ -99,10 +99,10 @@ This creates `prd.json` with user stories structured for autonomous execution.
 
 ```bash
 # 1) Create PRD (interactive, uses prd skill)
-Load the prd skill and create a PRD for "[your feature description]"
+Load the prd skill and create a PRD for "[your feature description]". It writes `.ralph/prds/NNNN-prd-[feature].md` and `.ralph/tasks.json`.
 
-# 2) Convert to prd.json (ralph_prd skill)
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+# 2) (optional legacy) Convert existing PRD to JSON
+If you have an older markdown PRD, convert it to `.ralph/tasks.json` using the ralph skill; save the markdown under `.ralph/prds/`.
 
 # 3) Run Ralph against your project repo
 ./ralph.sh --target-repo /path/to/your/repo
