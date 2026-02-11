@@ -152,18 +152,18 @@ Story format:
 
 ## Step 4: Outputs and Sync
 
-- **Markdown PRD:** `.ralph/tasks/NNNN-prd-[feature-name].md` (next zero-padded number)
-- **Ralph JSON:** `.ralph/prd.json` in repo root
+- **Markdown PRD:** `.ralph/prds/NNNN-prd-[feature-name].md` (next zero-padded number)
+- **Ralph JSON:** `.ralph/tasks.json` in repo root
 - Keep titles, IDs, descriptions, acceptance criteria, and order identical between the markdown stories and JSON entries
 - When new requirements arrive before all existing `userStories` have `passes: true`, append the new stories to both files and preserve all unfinished stories and their current `passes` values; do not rewrite or drop unpassed stories
-- If any `passes: false` stories exist, do not archive the current `.ralph/prd.json`; instead, append new tasks to it so unfinished work remains
-- If an existing `.ralph/prd.json` belongs to a different feature and `.ralph/progress.md` has content, archive per runner convention before overwriting (only when all stories have `passes: true`)
+- If any `passes: false` stories exist, do not archive the current `.ralph/tasks.json`; instead, append new tasks to it so unfinished work remains
+- If an existing `.ralph/tasks.json` belongs to a different feature and `.ralph/progress.md` has content, archive per runner convention before overwriting (only when all stories have `passes: true`)
 
 ### Archiving (when feature changes)
-1. Read current `prd.json`
+1. Read current `tasks.json`
 2. If `branchName` differs and `progress.md` has content beyond its header:
    - Create `archive/YYYY-MM-DD-[feature-name]/`
-   - Copy `prd.json` and `progress.md` there
+   - Copy `tasks.json` and `progress.md` there
    - Reset `progress.md` header
 
 ---
@@ -180,4 +180,4 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 - [ ] Stories are small, ordered by dependency, and mapped 1:1 between markdown and JSON
 - [ ] Every story has verifiable acceptance criteria with required boilerplate lines
 - [ ] Functional requirements are numbered; non-goals set boundaries
-- [ ] Files saved to `.ralph/tasks/NNNN-prd-[feature].md` and `.ralph/prd.json` with matching content
+- [ ] Files saved to `.ralph/prds/NNNN-prd-[feature].md` and `.ralph/tasks.json` with matching content
