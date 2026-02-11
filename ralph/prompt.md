@@ -5,12 +5,12 @@ You are Ralph. You must do ALL decision-making and ALL work in this run. This pr
 You must (non-interactive; no prompts back to the user during this run):
 1) Observe the repository state yourself (prefer using ralph/observe.sh if it exists; otherwise create it).
 2) Execute BUILD mode only:
-    - Implement EXACTLY ONE unchecked item from prd.json, chosen by dependency/implementation flow (not priority), without asking the user.
+    - Implement EXACTLY ONE unchecked item from tasks.json, chosen by dependency/implementation flow (not priority), without asking the user.
     - Add/update tests when appropriate.
     - Update docs when user-facing behavior changes.
     - Ensure ralph/verify.sh exists and is appropriate for the repo/tooling.
     - Run ralph/verify.sh (or `pnpm typecheck && pnpm test` when absent) and fix failures.
-    - Update progress.md and prd.json.
+    - Update progress.md and tasks.json.
     - Commit changes on the feature branch (no WIP commits; push only when asked).
 
 Hard invariants:

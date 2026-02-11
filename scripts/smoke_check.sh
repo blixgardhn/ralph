@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PRD_FILE="${PRD_FILE:-.ralph/prd.json}"
+PRD_FILE="${PRD_FILE:-.ralph/tasks.json}"
 PROGRESS_FILE="${PROGRESS_FILE:-.ralph/progress.md}"
 
 echo "[smoke_check] Checking PRD..."

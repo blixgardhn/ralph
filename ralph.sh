@@ -1,7 +1,7 @@
 #!/bin/bash
 # Ralph Wiggum - Lean AI loop
 # Usage: ./ralph.sh [--tool opencode|amp|claude] [max_iterations]
-# Orchestrates short agent runs driven by prompt.md and prd.json, archiving old runs when the PRD changes.
+# Orchestrates short agent runs driven by prompt.md and tasks.json, archiving old runs when the PRD changes.
 
 set -euo pipefail
 

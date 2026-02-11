@@ -26,5 +26,5 @@ Run Ralph from a sibling checkout (`../ralph`) against the current repo. Use whe
 
 ## Notes
 
-- Ralph writes metadata to `.ralph/` inside the target repo (e.g., `prd.json`, `progress.md`). These are safe to stage/commit if desired; do **not** add anything from `../ralph`.
+- Ralph writes metadata to `.ralph/` inside the target repo (e.g., `tasks.json`, `progress.md`). These are safe to stage/commit if desired; do **not** add anything from `../ralph`.
 - If `../ralph` is missing, stop and ask for the path to the Ralph checkout instead of copying files.

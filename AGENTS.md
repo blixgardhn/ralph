@@ -4,7 +4,7 @@ You are an autonomous coding agent working on a focused topic. This file is the 
 
 ## Focus Mode
 
-The **prd.json** specifies the task list you should work on. Within that user story list:
+The **tasks.json** specifies the task list you should work on. Within that user story list:
 - You **select your own tasks** based on dependency/implementation flow (not priority).
 - You complete **one task at a time**, then stop and signal.
 - You **update progress** to track task status as you work.
@@ -91,14 +91,14 @@ Ralph (`ralph.sh`) orchestrates a loop of single-iteration agent runs until PRD 
 ### Key Files
 - `ralph.sh` — loop runner
 - `prompt.md` — iteration instructions (aligns to this file)
-- `prd.json.example` — PRD format example
+- `tasks.json.example` — PRD format example
 
 ### Guidelines
 - Keep iterations small; one story per run.
 - Always run against a target repo (never the runner itself); set `--target-repo` explicitly when invoking from the runner.
 - If `--target-repo` is omitted, Ralph uses the invocation working directory; ensure it is the intended target repo.
 - Append progress to `.ralph/progress.md`; keep Codebase Patterns concise but useful.
-- Update `prd.json` passes when a story is finished.
+- Update `tasks.json` passes when a story is finished.
 - Logs live in `progress.md` only: note key files/functions, commands run (including tests), outcomes, follow-ups.
 - Append suggested improvements to the target repo’s `.ralph/suggested_improvements.md` (kept with the target, not the runner).
 - If required tools/entrypoints/tests or blocking gaps exist, fix or create them first, then proceed.

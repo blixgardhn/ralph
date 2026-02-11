@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PRD_FILE="${PRD_FILE:-.ralph/prd.json}"
+PRD_FILE="${PRD_FILE:-.ralph/tasks.json}"
 SUGGESTIONS_FILE="${SUGGESTIONS_FILE:-.ralph/suggested_improvements.md}"
 PROGRESS_FILE="${PROGRESS_FILE:-.ralph/progress.md}"
 ALLOW_CREATE_SUGGESTIONS="${ALLOW_CREATE_SUGGESTIONS:-false}"
@@ -11,7 +11,7 @@ usage() {
   cat >&2 <<EOF
 Usage: scripts/check_prd.sh
 Env:
-  PRD_FILE: path to prd.json (default .ralph/prd.json)
+  PRD_FILE: path to tasks.json (default .ralph/tasks.json)
   SUGGESTIONS_FILE: path to suggested_improvements.md (default .ralph/suggested_improvements.md)
   PROGRESS_FILE: path to progress.md (default .ralph/progress.md)
   ALLOW_CREATE_SUGGESTIONS=true|false (default false)
@@ -30,7 +30,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 if [[ ! -f "$PRD_FILE" ]]; then
-  echo "[check_prd] PRD file not found at $PRD_FILE" >&2
+  echo "[check_prd] tasks file not found at $PRD_FILE" >&2
   exit 1
 fi
 

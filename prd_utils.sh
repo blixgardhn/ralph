@@ -16,7 +16,7 @@ configure_prd_paths() {
   METADATA_DIR="$target_root/.ralph"
   mkdir -p "$METADATA_DIR"
 
-  PRD_FILE="$METADATA_DIR/prd.json"
+  PRD_FILE="$METADATA_DIR/tasks.json"
   PROGRESS_FILE="$METADATA_DIR/progress.md"
 
   SUGGESTIONS_FILE="$METADATA_DIR/suggested_improvements.md"
@@ -26,7 +26,7 @@ configure_prd_paths() {
 
 require_prd_file() {
   if [ ! -f "$PRD_FILE" ]; then
-    echo "Missing PRD file; expected at $PRD_FILE" >&2
+    echo "Missing tasks file; expected at $PRD_FILE" >&2
     exit 1
   fi
 }
@@ -48,7 +48,7 @@ archive_prd_if_changed() {
   fi
 
   if [ -n "$unfinished_count" ] && [ "$unfinished_count" -gt 0 ]; then
-    echo "[Ralph] Skipping PRD archive: $unfinished_count unfinished stories remain." >&2
+    echo "[Ralph] Skipping tasks archive: $unfinished_count unfinished stories remain." >&2
     echo "$prd_hash" > "$LAST_PRD_HASH_FILE"
     return
   fi
@@ -57,7 +57,7 @@ archive_prd_if_changed() {
     local date name name_slug archive_folder
 
     date=$(date +%Y-%m-%d)
-    name="prd"
+    name="tasks"
     if command -v jq >/dev/null 2>&1; then
       name=$(jq -r '.branchName // .project // empty' "$PRD_FILE")
       [ -z "$name" ] && name="prd"
@@ -65,7 +65,7 @@ archive_prd_if_changed() {
     name_slug=$(echo "$name" | tr '[:space:]' '-' | tr -cs '[:alnum:]._-' '-')
     archive_folder="$ARCHIVE_DIR/$date-$name"
     mkdir -p "$archive_folder"
-    cp "$PRD_FILE" "$archive_folder/prd-$name_slug.json"
+    cp "$PRD_FILE" "$archive_folder/tasks-$name_slug.json"
     [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$archive_folder/progress.md"
     # Do not archive suggestions when they live outside the target repo; they stay in the runner.
     {

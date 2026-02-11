@@ -1,21 +1,21 @@
 ---
 name: prd
-description: "Default to PRD + prd.json for any change request. Use when planning a feature, starting a project, or whenever the user asks to change code unless they explicitly say to implement without a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out, convert to ralph prd.json, change the code." 
+description: "Default to PRD + tasks.json for any change request. Use when planning a feature, starting a project, or whenever the user asks to change code unless they explicitly say to implement without a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out, convert to ralph tasks.json, change the code." 
 user-invocable: true
 ---
 
 # PRD + Ralph JSON Generator
 
-Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ralph. Both outputs must describe the same stories, acceptance criteria, and ordering.
+Create a clear, actionable PRD in markdown and a synchronized `tasks.json` for Ralph. Both outputs must describe the same stories, acceptance criteria, and ordering.
 
 ---
 
 ## The Job
 
-1. Receive a feature or change request (assume PRD + prd.json is needed unless the user explicitly opts out)
+1. Receive a feature or change request (assume PRD + tasks.json is needed unless the user explicitly opts out)
 2. Ask 3-5 essential clarifying questions (lettered options)
 3. Generate the PRD in markdown
-4. Generate the matching `prd.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow)
+4. Generate the matching `tasks.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow)
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
 6. Keep tasks minimal and focused; split aggressively so each story fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one story.
 7. Before finalizing the PRD, take a high-level pass over all stories to ensure they fit together coherently and reorder them based on dependencies and implementation flow; the order must make sense end-to-end.
@@ -114,7 +114,7 @@ Story format:
 
 ---
 
-## Step 3: Ralph prd.json Structure
+## Step 3: Ralph tasks.json Structure
 
 ```json
 {

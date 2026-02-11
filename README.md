@@ -2,7 +2,7 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (OpenCode by default, or [Amp](https://ampcode.com)/[Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.md`, and `prd.json`.
+Ralph is an autonomous AI agent loop that runs AI coding tools (OpenCode by default, or [Amp](https://ampcode.com)/[Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.md`, and `tasks.json`.
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
@@ -41,7 +41,7 @@ chmod +x scripts/ralph/ralph.sh
 
 Run project commands through container entrypoints (docker compose / podman compose). Keep project dependencies out of the host.
 
-When you start a new PRD (or edit the current `prd.json`), Ralph auto-archives the previous run’s `prd.json` and `progress.md` into `archive/YYYY-MM-DD-<branch>/` and resets `progress.md` so each requirement set stays isolated.
+When you start a new PRD (or edit the current `tasks.json`), Ralph auto-archives the previous run’s `tasks.json` and `progress.md` into `archive/YYYY-MM-DD-<branch>/` and resets `progress.md` so each requirement set stays isolated.
 
 ### Option 2: Install skills globally (Amp/Claude)
 
@@ -81,7 +81,7 @@ Use the PRD skill to generate a detailed requirements document:
 Load the prd skill and create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+Answer the clarifying questions. The skill saves output to `.ralph/prds/NNNN-prd-[feature-name].md` and `.ralph/tasks.json`.
 
 Before finalizing, take a high-level pass across all user stories: make sure they fit together, reorder them if dependencies or narrative flow suggest a better sequence, and promote any oversized subtasks into standalone stories, then re-run the overview and ordering.
 
@@ -90,10 +90,10 @@ Before finalizing, take a high-level pass across all user stories: make sure the
 Use the Ralph skill to convert the markdown PRD to JSON:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+Load the ralph skill and convert prds/NNNN-prd-[feature-name].md to tasks.json
 ```
 
-This creates `prd.json` with user stories structured for autonomous execution.
+This creates `tasks.json` with user stories structured for autonomous execution.
 
 ### Quick start (minimal example)
 
@@ -125,7 +125,7 @@ Default is 30 iterations. Use `--tool amp` or `--tool claude` to override the de
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
+2. Pick the next story where `passes: false` based on dependency/implementation flow
 3. Implement that single story
 4. Run quality checks inside containers (typecheck, tests; no host toolchains)
 5. Commit if checks pass
@@ -140,8 +140,8 @@ Ralph will:
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool opencode|amp|claude`, default OpenCode) |
 | `prompt.md` | Prompt template for the AI tool |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
+| `tasks.json` | User stories with `passes` status (the task list) |
+| `tasks.json.example` | Example PRD format for reference |
 | `progress.md` | Append-only learnings for future iterations |
 | `suggested_improvements.md` | Suggestions logged after each iteration to refine the loop (lives in the target repo) |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
@@ -154,7 +154,7 @@ Ralph will:
 Each iteration spawns a **new AI instance** (OpenCode/Amp/Claude Code) with clean context. The only memory between iterations is:
 - Git history (commits from previous iterations)
 - `progress.md` (learnings and context)
-- `prd.json` (which stories are done)
+- `tasks.json` (which stories are done)
 
 ### Small Tasks
 
@@ -201,7 +201,7 @@ Check current state:
 
 ```bash
 # See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
+cat tasks.json | jq '.userStories[] | {id, title, passes}'
 
 # See learnings from previous iterations
 cat progress.md
