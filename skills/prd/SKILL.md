@@ -18,10 +18,11 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 4. Generate the matching `prd.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow)
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
 6. Keep tasks minimal and focused; split aggressively so each story fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one story.
-7. Before finalizing the PRD, take a high-level pass over all stories to ensure they fit together coherently and reorder them based on dependencies and implementation flow.
+7. Before finalizing the PRD, take a high-level pass over all stories to ensure they fit together coherently and reorder them based on dependencies and implementation flow; the order must make sense end-to-end.
 8. During that pass, if any subtasks are large enough to stand alone, promote them to user stories, then re-run the overview and reorder as needed.
-9. For each user story, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that story.
-10. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
+9. If the project lacks a minimal scaffold (or more), include an initial story to create it so later tasks have a foundation.
+10. For each user story, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that story.
+11. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
 
 **Important:** Do NOT implement the feature. Deliver specs only.
 
@@ -138,6 +139,7 @@ Story format:
 - Target 6–10 stories for a typical feature; never fewer than 4 unless the feature is truly tiny.
 - Each story must fit in one Ralph iteration (~1–2 hours). If it needs backend + UI + docs, split.
 - Split by dependency order: schema → backend/service/API → UI → validation/edge cases → docs/ops.
+- If no scaffold exists, the first story should create a minimal one (or more) so downstream tasks have a base.
 - If a story spans multiple boundaries (DB + API + UI) or has >4 acceptance criteria, split it.
 - Schema+UI in one story is not allowed—separate data changes from presentation changes.
 - IDs sequential (US-001...); story order follows dependency and implementation flow. Do not add priority fields—selection happens at runtime based on dependencies/flow.
