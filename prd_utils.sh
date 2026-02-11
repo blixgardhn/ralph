@@ -44,7 +44,7 @@ archive_prd_if_changed() {
   [ -f "$LAST_PRD_HASH_FILE" ] && last_prd_hash=$(cat "$LAST_PRD_HASH_FILE" || true)
 
   if command -v jq >/dev/null 2>&1; then
-    unfinished_count=$(jq '[.userStories[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo "")
+    unfinished_count=$(jq '[.tasks[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo "")
   fi
 
   if [ -n "$unfinished_count" ] && [ "$unfinished_count" -gt 0 ]; then
@@ -159,15 +159,15 @@ validate_prd() {
 
   local story_count missing_fields
 
-  story_count=$(jq '.userStories | length' "$PRD_FILE" 2>/dev/null || echo 0)
+  story_count=$(jq '.tasks | length' "$PRD_FILE" 2>/dev/null || echo 0)
   if [ "$story_count" -eq 0 ]; then
-    echo "PRD has no userStories; add stories before running Ralph." >&2
+    echo "PRD has no tasks; add tasks before running Ralph." >&2
     exit 1
   fi
 
-  missing_fields=$(jq -r '.userStories[] | select((.id? | type != "string") or (.title? | type != "string") or (.passes? | type != "boolean")) | .id // "<no id>"' "$PRD_FILE" 2>/dev/null || true)
+  missing_fields=$(jq -r '.tasks[] | select((.id? | type != "string") or (.title? | type != "string") or (.passes? | type != "boolean")) | .id // "<no id>"' "$PRD_FILE" 2>/dev/null || true)
   if [ -n "$missing_fields" ]; then
-    echo "PRD has stories missing required fields (id/title/passes). Offending IDs: $missing_fields" >&2
+    echo "PRD has tasks missing required fields (id/title/passes). Offending IDs: $missing_fields" >&2
     exit 1
   fi
 }

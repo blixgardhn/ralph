@@ -46,8 +46,8 @@ if [[ ! -f "$SUGGESTIONS_FILE" ]]; then
 fi
 
 # Validate basic shape
-if ! jq -e '.project and .branchName and (.userStories | type == "array")' "$PRD_FILE" >/dev/null; then
-  echo "[check_prd] Missing project, branchName, or userStories array" >&2
+if ! jq -e '.project and .branchName and (.tasks | type == "array")' "$PRD_FILE" >/dev/null; then
+  echo "[check_prd] Missing project, branchName, or tasks array" >&2
   exit 1
 fi
 
@@ -61,23 +61,23 @@ if [[ "$ENFORCE_BRANCH" == "true" ]] && command -v git >/dev/null 2>&1; then
 fi
 
 missing_required=$(jq -r '
-  .userStories[] | select(
+  .tasks[] | select(
     (.id | not) or (.title | not) or (.description | not) or (.acceptanceCriteria | not) or (.passes | type != "boolean")
   ) | .id // "<missing-id>"' "$PRD_FILE")
 
 if [[ -n "$missing_required" ]]; then
-  echo "[check_prd] Stories missing required fields (id/title/description/acceptanceCriteria/passes):" >&2
+  echo "[check_prd] Tasks missing required fields (id/title/description/acceptanceCriteria/passes):" >&2
   echo "$missing_required" >&2
   exit 1
 fi
 
 missing_boilerplate=$(jq -r '
-  .userStories[] | select(
+  .tasks[] | select(
     ([.acceptanceCriteria[]?] | index("Typecheck passes")) | not
   ) | .id' "$PRD_FILE")
 
 if [[ -n "$missing_boilerplate" ]]; then
-  echo "[check_prd] Stories missing acceptance criterion: Typecheck passes" >&2
+  echo "[check_prd] Tasks missing acceptance criterion: Typecheck passes" >&2
   echo "$missing_boilerplate" >&2
   exit 1
 fi

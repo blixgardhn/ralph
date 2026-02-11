@@ -156,20 +156,20 @@ announce_story_selection() {
   local iteration="$1"
 
   if ! command -v jq >/dev/null 2>&1; then
-    echo "[Ralph] Story selection skipped (jq not installed)." >&2
+    echo "[Ralph] Task selection skipped (jq not installed)." >&2
     return 0
   fi
 
   if [ ! -f "$PRD_FILE" ]; then
-    echo "[Ralph] Story selection skipped (missing PRD at $PRD_FILE)." >&2
+    echo "[Ralph] Task selection skipped (missing PRD at $PRD_FILE)." >&2
     return 0
   fi
 
   local story_json
-  story_json=$(jq '(.userStories // []) | map(select(.passes != true)) | sort_by((.priority // 2147483647), .id) | .[0]' "$PRD_FILE" 2>/dev/null || true)
+  story_json=$(jq '(.tasks // []) | map(select(.passes != true)) | sort_by((.priority // 2147483647), .id) | .[0]' "$PRD_FILE" 2>/dev/null || true)
 
   if [ -z "$story_json" ] || [ "$story_json" = "null" ]; then
-    echo "[Ralph] No pending stories to pick." >&2
+    echo "[Ralph] No pending tasks to pick." >&2
     return 0
   fi
 
@@ -180,7 +180,7 @@ announce_story_selection() {
 
   local selection_block
   selection_block=$(cat <<EOF
->>> Story Selection (iteration $iteration)
+>>> Task Selection (iteration $iteration)
 ID: $story_id
 Title: $story_title
 Description: $story_description
@@ -191,7 +191,7 @@ EOF
 
   if [ -n "$PROGRESS_FILE" ]; then
     {
-      echo "## $(date --iso-8601=seconds) - Story selection (iteration $iteration)"
+      echo "## $(date --iso-8601=seconds) - Task selection (iteration $iteration)"
       echo "- ID: $story_id"
       echo "- Title: $story_title"
       echo "- Description: $story_description"
@@ -210,7 +210,7 @@ run_iteration() {
   echo "  Ralph Iteration $iteration of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
-  announce_story_selection "$iteration"
+   announce_story_selection "$iteration"
 
   local OUTPUT
   if [[ "$TOOL" == "amp" ]]; then
@@ -223,9 +223,9 @@ run_iteration() {
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
-    REMAINING=$(jq '[.userStories[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo 0)
+    REMAINING=$(jq '[.tasks[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo 0)
     if [ "$REMAINING" -eq 0 ]; then
-      echo "All stories marked done; rerun full test suite before finish." >&2
+       echo "All tasks marked done; rerun full test suite before finish." >&2
     fi
   fi
 

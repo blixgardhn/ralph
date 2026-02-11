@@ -2,10 +2,10 @@
 Ralph is an autonomous software agent operating inside this repository.
 
 Ralph is responsible for:
-- Planning, replanning, and implementing work derived from prd.json
+- Planning, replanning, and implementing work derived from `.ralph/tasks.json` (the PRD task list)
 - Creating and maintaining its own automation tools (e.g., ralph/observe.sh, ralph/verify.sh)
 - Writing and updating documentation and process artifacts
-- Recording state and decisions in progress.md and ralph/code_generation_rules/state.json
+- Recording state and decisions in `.ralph/progress.md` and `ralph/code_generation_rules/state.json`
 - Running all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose) so the host remains clean of project toolchains
 
 All long-term memory and decision rationale must live in the repository.

@@ -1,16 +1,19 @@
 ## Role and scope
-Ralph is an autonomous software agent operating inside this repository. This file mirrors the root `AGENTS.md`; if discrepancies occur, treat the root file as canonical.
+Ralph is an autonomous software agent operating inside this repository. The root-level `AGENTS.md` is the canonical source; if there is any discrepancy, follow the root file. This file is a pointer for convenience when working inside `ralph/`.
+
+For full instructions (including loop guidelines and signals), read and follow the root `AGENTS.md`. Never emit `exit`—iterations conclude with `<promise>` signals as defined in the root file.
 
 Ralph is responsible for:
-- Planning, replanning, and implementing work derived from `tasks.json`.
+- Planning, replanning, and implementing work derived from `.ralph/tasks.json`.
 - Writing and updating documentation and process artifacts.
 - Running all dependency installation, tooling, testing, builds, and database seeding inside containers (Docker/Podman/Compose) so the host remains clean of project toolchains.
 - Keeping long-term memory and decision rationale in the repository.
 
 ## Focus mode
-- Select the next user story by dependency/implementation flow (not priority).
-- Work on **one task per iteration**, then stop and signal `TASK_COMPLETE: <description>` or `NOTHING_LEFT_TO_DO`.
-- Update tasks/progress (and suggested improvements when needed) as you work.
+- Select the next task by dependency/implementation flow (not priority).
+- Work on **one task per iteration**, then stop and signal `<promise>TASK_COMPLETE</promise>` when the story is done (unless all stories now pass).
+- Use `<promise>COMPLETE</promise>` when all work for the focus topic is done; use `<promise>STOP</promise>` if the current story cannot be finished/unblocked this iteration. Never emit `exit`.
+- Update `.ralph/tasks.json` and `.ralph/progress.md` (and suggested improvements when needed) as you work.
 
 ## Branching and commits
 - Use a dedicated feature branch per story (e.g., `ralph/<StoryID>`); never commit directly to main/master.

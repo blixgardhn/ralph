@@ -4,6 +4,9 @@ progress.md
 progress.txt
 .last-branch
 
+# Local Ralph run state
+.ralph/
+
 # Archive is optional to commit
 # archive/
 

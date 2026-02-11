@@ -83,7 +83,7 @@ Load the prd skill and create a PRD for [your feature description]
 
 Answer the clarifying questions. The skill saves output to `.ralph/prds/NNNN-prd-[feature-name].md` and `.ralph/tasks.json`.
 
-Before finalizing, take a high-level pass across all user stories: make sure they fit together, reorder them if dependencies or narrative flow suggest a better sequence, and promote any oversized subtasks into standalone stories, then re-run the overview and ordering.
+Before finalizing, take a high-level pass across all tasks: make sure they fit together, reorder them if dependencies or narrative flow suggest a better sequence, and promote any oversized subtasks into standalone tasks, then re-run the overview and ordering.
 
 ### 2. Convert PRD to Ralph format
 
@@ -93,7 +93,7 @@ Use the Ralph skill to convert the markdown PRD to JSON:
 Load the ralph skill and convert prds/NNNN-prd-[feature-name].md to tasks.json
 ```
 
-This creates `tasks.json` with user stories structured for autonomous execution.
+This creates `.ralph/tasks.json` with tasks structured for autonomous execution.
 
 ### Quick start (minimal example)
 
@@ -125,14 +125,14 @@ Default is 30 iterations. Use `--tool amp` or `--tool claude` to override the de
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
-2. Pick the next story where `passes: false` based on dependency/implementation flow
-3. Implement that single story
+2. Pick the next task where `passes: false` based on dependency/implementation flow
+3. Implement that single task
 4. Run quality checks inside containers (typecheck, tests; no host toolchains)
 5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.md`
+6. Update `.ralph/tasks.json` to mark the task as `passes: true`
+7. Append learnings to `.ralph/progress.md`
 8. Append improvement suggestions to the target repo’s `.ralph/suggested_improvements.md` (only when concrete learnings exist)
-9. Repeat until all stories pass or max iterations reached
+9. Repeat until all tasks pass or max iterations reached
 
 ## Key Files
 
@@ -140,10 +140,10 @@ Ralph will:
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool opencode|amp|claude`, default OpenCode) |
 | `prompt.md` | Prompt template for the AI tool |
-| `tasks.json` | User stories with `passes` status (the task list) |
+| `.ralph/tasks.json` | PRD-backed tasks with `passes` status (the task list) |
+| `.ralph/progress.md` | Append-only learnings for future iterations |
 | `tasks.json.example` | Example PRD format for reference |
-| `progress.md` | Append-only learnings for future iterations |
-| `suggested_improvements.md` | Suggestions logged after each iteration to refine the loop (lives in the target repo) |
+| `.ralph/suggested_improvements.md` | Suggestions logged after each iteration to refine the loop (lives in the target repo) |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph_prd/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 
@@ -201,7 +201,7 @@ Check current state:
 
 ```bash
 # See which stories are done
-cat tasks.json | jq '.userStories[] | {id, title, passes}'
+cat .ralph/tasks.json | jq '.tasks[] | {id, title, passes}'
 
 # See learnings from previous iterations
 cat progress.md
