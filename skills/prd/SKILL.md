@@ -27,6 +27,26 @@ Create a clear, actionable PRD in markdown and a synchronized `prd.json` for Ral
 
 ---
 
+## Software Development Process - Overview
+
+The software development process goes in stages and, with agile, parts of this flow loop while progressing toward the end goal.
+
+### Software Delivery Flow (10 Steps)
+- Idea → Capture the problem, goals, constraints, stakeholders, and success metrics.
+- PRD → Write a concise PRD with scope, non-functional requirements, milestones, and risks; get stakeholder sign-off.
+- Solution Design → Draft architecture, data model, API contracts, edge cases, and traceability back to PRD.
+- Project Scaffolding → Generate repo structure, CI hooks, linters/formatters, env configuration, and secrets handling.
+- Backlog & Plan → Break into tickets (features/tech tasks), estimate, prioritize, and define acceptance criteria per ticket.
+- Implementation → Code in small branches/PRs, follow conventions, keep commits purposeful, and update docs as you go.
+- Tests → Add/maintain unit, integration, and contract tests plus fixtures; aim for fast feedback locally and in CI.
+- CI/CD → Ensure automated lint/test/build, artifacts, and gated merges; provision preview environments if applicable.
+- Verification → Run end-to-end and non-functional tests (performance, security, accessibility); fix regressions; update changelog/release notes.
+- Acceptance & Release → Demonstrate against PRD acceptance criteria, obtain sign-off, tag/release, and monitor post-release.
+
+You must always understand what part of this flow your project is in, what the prerequisites are for each stage, and how tasks connect across phases.
+
+---
+
 ## Step 1: Clarifying Questions
 
 Ask only the critical gaps. Focus on Problem/Goal, Core Functionality, Scope/Boundaries, and Success Criteria.
