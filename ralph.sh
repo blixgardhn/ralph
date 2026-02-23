@@ -61,7 +61,7 @@ set_paths() {
   local invocation_pwd
   invocation_pwd="$PWD"
 
-  PROMPT_FILE="$RALPH_ROOT/prompt.md"
+  PROMPT_FILE="$RALPH_ROOT/ralph-specs/prompt.md"
 
   local target_repo_input
   if [ -n "$TARGET_REPO_ARG" ]; then
@@ -234,7 +234,7 @@ warn_if_target_instructions_present() {
   fi
 
   if [ -f "$target_prompt" ]; then
-    echo "[Ralph] Warning: found ralph/prompt.md in target repo ($target_prompt) but runner prompt at $RALPH_ROOT/prompt.md will be used." >&2
+    echo "[Ralph] Warning: found ralph/prompt.md in target repo ($target_prompt) but runner prompt at $PROMPT_FILE will be used." >&2
     warned=true
   fi
 

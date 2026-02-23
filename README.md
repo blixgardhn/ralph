@@ -34,7 +34,7 @@ mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
 
 # Copy the prompt template:
-cp /path/to/ralph/prompt.md scripts/ralph/prompt.md
+cp /path/to/ralph/ralph-specs/prompt.md scripts/ralph/prompt.md
 
 chmod +x scripts/ralph/ralph.sh
 ```
@@ -131,7 +131,7 @@ Ralph will:
 5. Commit if checks pass
 6. Update `.ralph/tasks.json` to mark the task as `passes: true`
 7. Append learnings to `.ralph/progress.md`
-8. Append improvement suggestions to the target repo’s `.ralph/suggested_improvements.md` (only when concrete learnings exist)
+8. Capture Ralph-runner improvement ideas in the runner’s `.ralph/suggested_improvements.md` (not target project tweaks)
 9. Repeat until all tasks pass or max iterations reached
 
 ## Key Files
@@ -139,11 +139,11 @@ Ralph will:
 | File | Purpose |
 |------|---------|
 | `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool opencode|amp|claude`, default OpenCode) |
-| `prompt.md` | Prompt template for the AI tool |
+| `ralph-specs/prompt.md` | Prompt template for the AI tool |
 | `.ralph/tasks.json` | PRD-backed tasks with `passes` status (the task list) |
 | `.ralph/progress.md` | Append-only learnings for future iterations |
 | `tasks.json.example` | Example PRD format for reference |
-| `.ralph/suggested_improvements.md` | Suggestions logged after each iteration to refine the loop (lives in the target repo) |
+| `.ralph/suggested_improvements.md` | Suggestions to improve the Ralph runner/prompts/process (lives with the runner) |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph_prd/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 
@@ -212,7 +212,7 @@ git log --oneline -10
 
 ## Customizing the Prompt
 
-After copying `prompt.md` to your project, customize it for your project:
+After copying `ralph-specs/prompt.md` to your project, customize it for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack

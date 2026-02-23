@@ -1,6 +1,6 @@
 # Ralph Auto Loop - Autonomous Implementation Agent
 
-You are an autonomous coding agent working on a focused topic. This file is the canonical policy; `prompt.md`, `ralph/AGENTS.md`, and `ralph/prompt.md` must match it.
+You are an autonomous coding agent working on a focused topic. This file is the canonical policy; `ralph-specs/prompt.md`, `ralph/AGENTS.md`, and `ralph/prompt.md` must match it.
 
 ## Focus Mode
 
@@ -13,7 +13,7 @@ The `.ralph/tasks.json` specifies the tasks you should work on (derived from the
 
 ## Specs (if present)
 
-The `specs/` directory contains all documentation about this application:
+The `ralph-specs/` directory contains all documentation about this application:
 - **Implementation plans** - specifications for features to be built
 - **Best practices** - conventions for Effect, React, testing, etc.
 - **Architecture context** - how the app has been built and why
@@ -57,7 +57,7 @@ Use OpenCode built-in tools (read, write, edit, bash, etc.) with absolute paths.
 2. Read PRD/progress/specs to understand context.
 3. Select the next story by dependency/flow and work only on it.
 4. Implement and test in containers; keep changes minimal and focused.
-5. Update PRD/progress (and suggested_improvements if needed).
+5. Update PRD/progress; log Ralph-runner improvement ideas to the runner’s `.ralph/suggested_improvements.md` when needed (not target-project tweaks).
 6. Run verification (prefer `ralph/verify.sh`; else `pnpm typecheck && pnpm test`).
 7. Commit on the feature branch; push only when asked.
 8. Signal with promises: use `<promise>TASK_COMPLETE</promise>` when a story is done and other stories remain; use `<promise>COMPLETE</promise>` when all stories pass; use `<promise>STOP</promise>` when the current story cannot be finished/unblocked this iteration. Never emit `exit`.
@@ -91,7 +91,7 @@ Ralph (`ralph.sh`) orchestrates a loop of single-iteration agent runs until PRD 
 
 ### Key Files
 - `ralph.sh` — loop runner
-- `prompt.md` — iteration instructions (aligns to this file)
+- `ralph-specs/prompt.md` — iteration instructions (aligns to this file)
 - `.ralph/tasks.json` — PRD-backed tasks with `passes` status
 - `.ralph/progress.md` — append-only learnings for iterations
 - `tasks.json.example` — PRD format example
@@ -103,7 +103,7 @@ Ralph (`ralph.sh`) orchestrates a loop of single-iteration agent runs until PRD 
 - Append progress to `.ralph/progress.md`; keep Codebase Patterns concise but useful.
 - Update `tasks.json` passes when a story is finished.
 - Logs live in `.ralph/progress.md` only: note key files/functions, commands run (including tests), outcomes, follow-ups.
-- Append suggested improvements to the target repo’s `.ralph/suggested_improvements.md` (kept with the target, not the runner).
+- Append suggested improvements about Ralph itself (runner, prompts, process) to the runner’s `.ralph/suggested_improvements.md`.
 - If required tools/entrypoints/tests or blocking gaps exist, fix or create them first, then proceed.
 - Conclude iterations with signals: use `<promise>COMPLETE</promise>` when all stories pass; use `<promise>STOP</promise>` when the current story cannot be finished/unblocked this iteration (do not switch stories). Never emit `exit`—always finish with a `<promise>` signal.
 - Update README when user-facing behavior changes.
