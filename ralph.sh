@@ -293,11 +293,15 @@ EOF
 
 run_iteration() {
   local iteration="$1"
+  local start_ts end_ts
+  start_ts=$(date --iso-8601=seconds)
 
   echo ""
   echo "==============================================================="
   echo "  Ralph Iteration $iteration of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
+
+  echo "[Ralph][debug] iteration=$iteration start_ts=$start_ts tool=$TOOL target=$TARGET_REPO_ROOT prompt=$PROMPT_FILE agents=$RUNNER_AGENTS_FILE" >&2
 
    announce_story_selection "$iteration"
 
@@ -312,16 +316,20 @@ run_iteration() {
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | opencode run --model "$OPENCODE_MODEL" 2>&1 | tee >(cat >&2)) || true
   fi
 
+  echo "[Ralph][debug] iteration=$iteration model_invocation=done" >&2
+
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
     REMAINING=$(jq '[.tasks[] | select(.passes != true)] | length' "$PRD_FILE" 2>/dev/null || echo 0)
     if [ "$REMAINING" -eq 0 ]; then
        echo "All tasks marked done; rerun full test suite before finish." >&2
     fi
+    echo "[Ralph][debug] iteration=$iteration remaining_tasks=$REMAINING" >&2
   fi
 
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
     echo ""
     echo "Ralph completed all tasks at iteration $iteration."
+    echo "[Ralph][debug] iteration=$iteration outcome=COMPLETE" >&2
     record_suggestions "$iteration" "complete" "$OUTPUT"
     exit 0
   fi
@@ -329,21 +337,28 @@ run_iteration() {
   if echo "$OUTPUT" | grep -q "<promise>STOP</promise>"; then
     echo ""
     echo "Ralph requested stop at iteration $iteration."
+    echo "[Ralph][debug] iteration=$iteration outcome=STOP" >&2
     record_suggestions "$iteration" "stopped" "$OUTPUT"
     exit 0
   fi
 
-  record_suggestions "$iteration" "continued" "$OUTPUT"
+  #record_suggestions "$iteration" "continued" "$OUTPUT"
+  end_ts=$(date --iso-8601=seconds)
+  echo "[Ralph][debug] iteration=$iteration outcome=CONTINUE start_ts=$start_ts end_ts=$end_ts" >&2
   echo "Iteration $iteration finished; continuing..."
 }
 
 run_iterations() {
   echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+  echo "[Ralph][debug] run_iterations start target=$TARGET_REPO_ROOT prompt=$PROMPT_FILE agents=$RUNNER_AGENTS_FILE max_iters=$MAX_ITERATIONS" >&2
   for i in $(seq 1 "$MAX_ITERATIONS"); do
+    echo "[Ralph][debug] run_iterations invoking iteration=$i" >&2
     run_iteration "$i"
+    echo "[Ralph][debug] run_iterations completed iteration=$i" >&2
   done
 
   echo "Reached max iterations ($MAX_ITERATIONS) without completion."
+  echo "[Ralph][debug] run_iterations exhausted max_iterations=$MAX_ITERATIONS" >&2
   exit 1
 }
 
