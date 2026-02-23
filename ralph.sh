@@ -10,6 +10,7 @@ MAX_ITERATIONS=30
 OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 TARGET_REPO_ROOT="" # target repo root where code will be generated
+RUNNER_AGENTS_FILE="$RALPH_ROOT/AGENTS.md"
 
 TARGET_REPO_ARG=""
 
@@ -94,6 +95,74 @@ set_paths() {
   configure_prd_paths "$TARGET_REPO_ROOT"
 }
 
+require_agents_file() {
+  if [ ! -f "$RUNNER_AGENTS_FILE" ]; then
+    echo "Missing AGENTS file at $RUNNER_AGENTS_FILE" >&2
+    exit 1
+  fi
+}
+
+require_prompt_file() {
+  if [ ! -f "$PROMPT_FILE" ]; then
+    echo "Missing prompt file at $PROMPT_FILE" >&2
+    exit 1
+  fi
+}
+
+hash_and_size() {
+  local path="$1"
+  if [ ! -f "$path" ]; then
+    echo "absent"
+    return
+  fi
+  local hash size
+  hash=$(sha1sum "$path" | awk '{print $1}')
+  size=$(stat -c%s "$path" 2>/dev/null || stat -f%z "$path" 2>/dev/null || echo "?")
+  printf "%s/%s" "${hash:0:12}" "$size"
+}
+
+fail_if_target_instructions_present() {
+  local target_agents="$TARGET_REPO_ROOT/AGENTS.md"
+  local target_prompt="$TARGET_REPO_ROOT/ralph/prompt.md"
+
+  if [ -f "$target_agents" ]; then
+    echo "[Ralph] Error: target repo contains AGENTS.md ($target_agents) but runner instructions at $RUNNER_AGENTS_FILE must be used. Remove or rename the target copy." >&2
+    exit 1
+  fi
+
+  if [ -f "$target_prompt" ]; then
+    echo "[Ralph] Error: target repo contains ralph/prompt.md ($target_prompt) but runner prompt at $PROMPT_FILE must be used. Remove or rename the target copy." >&2
+    exit 1
+  fi
+}
+
+log_instruction_fingerprints() {
+  local agents_sig prompt_sig
+  agents_sig=$(hash_and_size "$RUNNER_AGENTS_FILE")
+  prompt_sig=$(hash_and_size "$PROMPT_FILE")
+  echo "[Ralph] Using runner instructions: AGENTS=$agents_sig PROMPT=$prompt_sig" >&2
+}
+
+log_context_resources() {
+  local rules_dotnet rules_python process_contract specs_count specs_hash specs_files
+  rules_dotnet=$(hash_and_size "$RALPH_ROOT/code_generation_rules/RULES-dotnet.md")
+  rules_python=$(hash_and_size "$RALPH_ROOT/code_generation_rules/RULES-python.md")
+  process_contract=$(hash_and_size "$RALPH_ROOT/process_contract")
+
+  specs_count="0"
+  specs_hash="absent"
+  specs_files=""
+  if [ -d "$RALPH_ROOT/specs" ]; then
+    specs_count=$(find "$RALPH_ROOT/specs" -maxdepth 1 -type f | wc -l | awk '{print $1}')
+    if [ "$specs_count" -gt 0 ]; then
+      specs_hash=$(find "$RALPH_ROOT/specs" -maxdepth 1 -type f -exec sha1sum {} + | sha1sum | awk '{print $1}')
+      specs_files=$(cd "$RALPH_ROOT/specs" && find . -maxdepth 1 -type f -print | sed 's#^./##' | sort | head -n 10 | tr '\n' ',' | sed 's/,$//')
+    fi
+  fi
+
+  echo "[Ralph] Context resources (runner): rules(dotnet)=$rules_dotnet rules(python)=$rules_python process_contract=$process_contract specs=count:$specs_count hash:${specs_hash:0:12} files:$specs_files" >&2
+}
+
 require_prompt() {
   if [ ! -f "$PROMPT_FILE" ]; then
     echo "Missing prompt file at $PROMPT_FILE"
@@ -150,6 +219,26 @@ enforce_feature_branch() {
   echo "[Ralph] Could not switch to or create branch '$prd_branch'." >&2
   echo "Try manually: git -C \"$TARGET_REPO_ROOT\" switch '$prd_branch' || git -C \"$TARGET_REPO_ROOT\" switch -c '$prd_branch'" >&2
   exit 1
+}
+
+warn_if_target_instructions_present() {
+  local target_agents="$TARGET_REPO_ROOT/AGENTS.md"
+  local target_prompt="$TARGET_REPO_ROOT/ralph/prompt.md"
+  local warned=false
+
+  if [ -f "$target_agents" ]; then
+    echo "[Ralph] Warning: found AGENTS.md in target repo ($target_agents) but runner instructions at $RALPH_ROOT/AGENTS.md will be used." >&2
+    warned=true
+  fi
+
+  if [ -f "$target_prompt" ]; then
+    echo "[Ralph] Warning: found ralph/prompt.md in target repo ($target_prompt) but runner prompt at $RALPH_ROOT/prompt.md will be used." >&2
+    warned=true
+  fi
+
+  if [ "$warned" = true ]; then
+    echo "[Ralph] If you intend to use target copies, run Ralph from the runner directory or adjust invocation." >&2
+  fi
 }
 
 announce_story_selection() {
@@ -213,13 +302,14 @@ run_iteration() {
    announce_story_selection "$iteration"
 
   local OUTPUT
+  local merged_prompt
+  merged_prompt="$(cat "$RUNNER_AGENTS_FILE"; printf '\n'; cat "$PROMPT_FILE")"
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$PROMPT_FILE" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
   elif [[ "$TOOL" == "claude" ]]; then
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$PROMPT_FILE" 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | claude --dangerously-skip-permissions --print 2>&1 | tee >(cat >&2)) || true
   else
-    PROMPT_TEXT="$(cat "$PROMPT_FILE")"
-    OUTPUT=$(printf "%s" "$PROMPT_TEXT" | opencode run --model "$OPENCODE_MODEL" 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | opencode run --model "$OPENCODE_MODEL" 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
@@ -261,11 +351,16 @@ main() {
   parse_args "$@"
   validate_tool
   set_paths
+  require_agents_file
+  require_prompt_file
+  fail_if_target_instructions_present
+  log_instruction_fingerprints
+  log_context_resources
+  warn_if_target_instructions_present
   require_prd_file
   if [ -x "$RALPH_ROOT/scripts/check_prd.sh" ]; then
     PRD_FILE="$PRD_FILE" SUGGESTIONS_FILE="$SUGGESTIONS_FILE" PROGRESS_FILE="$PROGRESS_FILE" ALLOW_CREATE_SUGGESTIONS=true "$RALPH_ROOT/scripts/check_prd.sh"
   fi
-  require_prompt
   enforce_feature_branch
   archive_prd_if_changed
   init_progress_file
