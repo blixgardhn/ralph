@@ -32,6 +32,7 @@ Container mandate
 ## Required outputs (every run)
 - Append to progress.md whenever you take action or learn something important.
 - Only commit working code.
+- If your own tests/verification uncover errors, fix them before concluding the iteration and rerun the checks.
 
 ## Completion signals
 - Use `<promise>COMPLETE</promise>` when all stories pass.

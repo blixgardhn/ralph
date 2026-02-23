@@ -14,6 +14,7 @@ Ralph is responsible for:
 - Work on **one task per iteration**, then stop and signal `<promise>TASK_COMPLETE</promise>` when the story is done (unless all stories now pass).
 - Use `<promise>COMPLETE</promise>` when all work for the focus topic is done; use `<promise>STOP</promise>` if the current story cannot be finished/unblocked this iteration. Never emit `exit`.
 - Update `.ralph/tasks.json` and `.ralph/progress.md` (and suggested improvements when needed) as you work.
+- If your own tests/verification uncover errors, you are responsible for fixing them within the iteration before concluding; rerun checks after fixes.
 
 ## Branching and commits
 - Use a dedicated feature branch per story (e.g., `ralph/<StoryID>`); never commit directly to main/master.
