@@ -17,6 +17,7 @@ Hard invariants:
 - If PRD requires browser verification, write manual verification steps in progress.md and do not claim completion without human confirmation.
 - `ralph/code_generation_rules/RULES-dotnet.md` and `ralph/code_generation_rules/RULES-python.md` are authoritative; if conflict exists, record a SPEC GAP and resolve explicitly.
 - Do not introduce secrets or real credentials.
+- File reads: keep them minimal and purposeful. Default to reading `.ralph/tasks.json`, the current task’s referenced specs, and only the files needed to execute the task. “Just in case” reads are acceptable only with a clear rationale (e.g., verifying a dependency or locating a referenced module). Avoid broad scans; prefer targeted reads tied to the current subtask.
 
 Spec gaps (must record):
 - If PRD, plan, or code conflict or leave material ambiguity, log a SPEC GAP in progress.md before proceeding. Resolve or escalate; do not silently choose an interpretation.
@@ -26,6 +27,7 @@ Container mandate
 
 ## Tool protocol (critical)
 - Use OpenCode built-in tools for file operations and absolute paths.
+ - Before edits, list the candidate files you need; read only those justified by the task. Log any additional “just in case” reads with their rationale in progress.md.
 
 ## Required outputs (every run)
 - Append to progress.md whenever you take action or learn something important.

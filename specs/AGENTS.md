@@ -25,6 +25,7 @@ Ralph is responsible for:
 ## Tool use
 - Use OpenCode built-in tools in lowercase (read, write, edit, bash, etc.) with absolute paths; call `read` before any edit.
 - Be precise with tool calls. Structured tool outputs only; no extra text when invoking tools.
+- File access discipline: read only what is necessary for the current task and acceptance criteria. “Just in case” reads are allowed only with a clear, written rationale (e.g., confirming a dependency or locating a referenced module). Default required reads: `.ralph/tasks.json`, the selected task context, and explicitly referenced specs. Avoid broad/bulk reads; prefer targeted file reads tied to the current subtask.
 
 ## Code generation rules
 `ralph/code_generation_rules/RULES-dotnet.md` and `ralph/code_generation_rules/RULES-python.md` are authoritative. If conflicts arise, record a SPEC GAP and resolve explicitly.

@@ -11,6 +11,8 @@ OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 TARGET_REPO_ROOT="" # target repo root where code will be generated
 RUNNER_AGENTS_FILE="$RALPH_ROOT/AGENTS.md"
+TOTAL_TASKS=0
+LOOP_START_SECS=0
 
 TARGET_REPO_ARG=""
 
@@ -93,6 +95,74 @@ set_paths() {
   TARGET_REPO_ROOT="$TARGET_REPO"
 
   configure_prd_paths "$TARGET_REPO_ROOT"
+}
+
+compute_total_tasks() {
+  if ! command -v jq >/dev/null 2>&1; then
+    TOTAL_TASKS=0
+    return
+  fi
+
+  if [ ! -f "$PRD_FILE" ]; then
+    TOTAL_TASKS=0
+    return
+  fi
+
+  TOTAL_TASKS=$(jq '(.tasks // []) | length' "$PRD_FILE" 2>/dev/null || echo 0)
+}
+
+format_duration() {
+  local seconds="$1"
+  if [ -z "$seconds" ] || [ "$seconds" -lt 0 ]; then
+    echo "0s"
+    return
+  fi
+  local h m s
+  h=$((seconds / 3600))
+  m=$(( (seconds % 3600) / 60 ))
+  s=$((seconds % 60))
+  if [ "$h" -gt 0 ]; then
+    printf "%dh %02dm %02ds" "$h" "$m" "$s"
+  elif [ "$m" -gt 0 ]; then
+    printf "%dm %02ds" "$m" "$s"
+  else
+    printf "%ds" "$s"
+  fi
+}
+
+render_progress() {
+  local completed="$1"
+  local remaining="$2"
+  local elapsed_secs="$3"
+
+  if [ -z "$TOTAL_TASKS" ] || [ "$TOTAL_TASKS" -le 0 ]; then
+    return
+  fi
+
+  local total percent filled empty bar eta
+  total="$TOTAL_TASKS"
+  percent=$((completed * 100 / total))
+  filled=$((percent / 5)) # 20-char bar
+  empty=$((20 - filled))
+
+  bar=""
+  if [ "$filled" -gt 0 ]; then
+    bar="$bar$(printf '%*s' "$filled" '' | tr ' ' '#')"
+  fi
+  if [ "$empty" -gt 0 ]; then
+    bar="$bar$(printf '%*s' "$empty" '' | tr ' ' '.')"
+  fi
+
+  eta="n/a"
+  if [ "$completed" -gt 0 ]; then
+    local per_task
+    per_task=$((elapsed_secs / completed))
+    eta=$(format_duration $((per_task * remaining)))
+  fi
+
+  local elapsed_fmt
+  elapsed_fmt=$(format_duration "$elapsed_secs")
+  echo "[Ralph][progress] [$bar] ${percent}% (${completed}/${total}) elapsed=${elapsed_fmt} eta=${eta} remaining=${remaining}" >&2
 }
 
 require_agents_file() {
@@ -293,6 +363,8 @@ EOF
 
 run_iteration() {
   local iteration="$1"
+  local iter_start
+  iter_start=$(date +%s)
 
   echo ""
   echo "==============================================================="
@@ -323,6 +395,11 @@ run_iteration() {
     echo ""
     echo "Ralph completed all tasks at iteration $iteration."
     record_suggestions "$iteration" "complete" "$OUTPUT"
+    local iter_end elapsed loop_elapsed
+    iter_end=$(date +%s)
+    elapsed=$((iter_end - iter_start))
+    loop_elapsed=$((iter_end - LOOP_START_SECS))
+    echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
     exit 0
   fi
 
@@ -330,10 +407,34 @@ run_iteration() {
     echo ""
     echo "Ralph requested stop at iteration $iteration."
     record_suggestions "$iteration" "stopped" "$OUTPUT"
+    local iter_end elapsed loop_elapsed
+    iter_end=$(date +%s)
+    elapsed=$((iter_end - iter_start))
+    loop_elapsed=$((iter_end - LOOP_START_SECS))
+    echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
     exit 0
   fi
 
   record_suggestions "$iteration" "continued" "$OUTPUT"
+  local iter_end elapsed loop_elapsed remaining_tasks completed_tasks
+  iter_end=$(date +%s)
+  elapsed=$((iter_end - iter_start))
+  loop_elapsed=$((iter_end - LOOP_START_SECS))
+  if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
+    remaining_tasks=$(jq '(.tasks // []) | map(select(.passes != true)) | length' "$PRD_FILE" 2>/dev/null || echo 0)
+  else
+    remaining_tasks=0
+  fi
+  if [ -z "$TOTAL_TASKS" ] || [ "$TOTAL_TASKS" -le 0 ]; then
+    completed_tasks=0
+  else
+    completed_tasks=$((TOTAL_TASKS - remaining_tasks))
+    if [ "$completed_tasks" -lt 0 ]; then
+      completed_tasks=0
+    fi
+  fi
+  echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
+  render_progress "$completed_tasks" "$remaining_tasks" "$loop_elapsed"
   echo "Iteration $iteration finished; continuing..."
 }
 
@@ -366,6 +467,8 @@ main() {
   init_progress_file
   init_suggestions_file
   validate_prd
+  LOOP_START_SECS=$(date +%s)
+  compute_total_tasks
   run_iterations
 }
 
