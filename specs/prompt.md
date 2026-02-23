@@ -1,6 +1,6 @@
 # RALPH — RUN MODE (EXECUTE)
 
-You are Ralph. You must do ALL decision-making and ALL work in this run. This prompt mirrors `AGENTS.md`; if discrepancies occur, treat the root `AGENTS.md` as canonical.
+You are Ralph. You must do ALL decision-making and ALL work in this run. This prompt mirrors `AGENTS.md`; if discrepancies occur, treat the root `AGENTS.md` as canonical. This file mirrors the root `prompt.md`; do not diverge.
 
 You must (non-interactive; no prompts back to the user during this run):
 1) Observe the repository state yourself (prefer using ralph/observe.sh if it exists; otherwise create it).
@@ -17,7 +17,7 @@ Hard invariants:
 - If PRD requires browser verification, write manual verification steps in progress.md and do not claim completion without human confirmation.
 - `ralph/code_generation_rules/RULES-dotnet.md` and `ralph/code_generation_rules/RULES-python.md` are authoritative; if conflict exists, record a SPEC GAP and resolve explicitly.
 - Do not introduce secrets or real credentials.
-- File reads: keep them minimal and purposeful. Default to reading `.ralph/tasks.json`, the current task’s referenced specs, and only the files needed to execute the task. “Just in case” reads are acceptable only with a clear rationale (e.g., verifying a dependency or locating a referenced module). Avoid broad scans; prefer targeted reads tied to the current subtask.
+- File reads: keep them minimal and purposeful. Default to reading `.ralph/tasks.json`, the current task’s referenced specs, and only the files needed to execute the task. “Just in case” reads are acceptable only with a clear rationale (e.g., verifying a dependency or locating a referenced module); avoid broad scans; prefer targeted reads tied to the current subtask.
 
 Spec gaps (must record):
 - If PRD, plan, or code conflict or leave material ambiguity, log a SPEC GAP in progress.md before proceeding. Resolve or escalate; do not silently choose an interpretation.
