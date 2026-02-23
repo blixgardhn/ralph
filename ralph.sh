@@ -151,18 +151,18 @@ log_context_resources() {
   rules_python=$(hash_and_size "$RALPH_ROOT/code_generation_rules/RULES-python.md")
   process_contract=$(hash_and_size "$RALPH_ROOT/process_contract")
 
-  specs_count="0"
-  specs_hash="absent"
-  specs_files=""
-  if [ -d "$RALPH_ROOT/specs" ]; then
-    specs_count=$(find "$RALPH_ROOT/specs" -maxdepth 1 -type f | wc -l | awk '{print $1}')
-    if [ "$specs_count" -gt 0 ]; then
-      specs_hash=$(find "$RALPH_ROOT/specs" -maxdepth 1 -type f -exec sha1sum {} + | sha1sum | awk '{print $1}')
-      specs_files=$(cd "$RALPH_ROOT/specs" && find . -maxdepth 1 -type f -print | sed 's#^./##' | sort | head -n 10 | tr '\n' ',' | sed 's/,$//')
-    fi
-  fi
+   specs_count="0"
+   specs_hash="absent"
+   specs_files=""
+   if [ -d "$RALPH_ROOT/ralph-specs" ]; then
+     specs_count=$(find "$RALPH_ROOT/ralph-specs" -maxdepth 1 -type f | wc -l | awk '{print $1}')
+     if [ "$specs_count" -gt 0 ]; then
+       specs_hash=$(find "$RALPH_ROOT/ralph-specs" -maxdepth 1 -type f -exec sha1sum {} + | sha1sum | awk '{print $1}')
+       specs_files=$(cd "$RALPH_ROOT/ralph-specs" && find . -maxdepth 1 -type f -print | sed 's#^./##' | sort | head -n 10 | tr '\n' ',' | sed 's/,$//')
+     fi
+   fi
 
-  echo "[Ralph] Context resources (runner): rules(dotnet)=$rules_dotnet rules(python)=$rules_python process_contract=$process_contract specs=count:$specs_count hash:${specs_hash:0:12} files:$specs_files" >&2
+   echo "[Ralph] Context resources (runner): rules(dotnet)=$rules_dotnet rules(python)=$rules_python process_contract=$process_contract specs=count:$specs_count hash:${specs_hash:0:12} files:$specs_files" >&2
 }
 
 require_prompt() {

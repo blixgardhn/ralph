@@ -16,7 +16,7 @@ Run exactly one unchecked task from `.ralph/tasks.json` per invocation, chosen b
 - Append Ralph-runner improvement ideas (not target-project tweaks) to the runner’s `.ralph/suggested_improvements.md`.
 - Commit only after verification passes; use the task ID in the commit message. Push only when asked.
 - If you cannot finish/unblock, reply `<promise>STOP</promise>` with a brief reason—do not switch tasks. Never emit `exit`.
-- Error handling: if verification/tests uncover errors, first attempt to fix and rerun checks within the iteration. If you cannot fix, use the PRD skill to create bugfix task(s), set the current task’s `dependsOn` to those new bugfix task IDs in `.ralph/tasks.json`, and exit the iteration without emitting a promise so the loop can restart with the new blockers.
+- Error handling: if verification/tests uncover errors, first attempt to fix and rerun checks within the iteration. If you cannot fix, use the PRD skill to create bugfix task(s), set the current task’s `dependsOn` to those new bugfix task IDs in `.ralph/tasks.json`, and exit the iteration without emitting a promise so the loop can restart with the new blockers. Use `dependsOn` sparingly—only when a true ordering dependency exists—to keep tasks parallelizable.
 
 ## Progress Log Format (to `progress.md`)
 ```

@@ -60,7 +60,7 @@ Use OpenCode built-in tools (read, write, edit, bash, etc.) with absolute paths.
 5. Update PRD/progress; log Ralph-runner improvement ideas to the runner’s `.ralph/suggested_improvements.md` when needed (not target-project tweaks).
 6. Run verification (prefer `ralph/verify.sh`; else `pnpm typecheck && pnpm test`).
 7. Commit on the feature branch; push only when asked.
-8. Signal with promises: use `<promise>TASK_COMPLETE</promise>` when a story is done and other stories remain; use `<promise>COMPLETE</promise>` when all stories pass; use `<promise>STOP</promise>` when the current story cannot be finished/unblocked this iteration. Never emit `exit`.
+8. Signal with promises: use `<promise>TASK_COMPLETE</promise>` when a story is done and other stories remain; use `<promise>COMPLETE</promise>` when all stories pass; use `<promise>STOP</promise>` when the current story cannot be finished/unblocked this iteration. Never emit `exit`. Use `dependsOn` sparingly—only when strict ordering is required—so tasks stay parallelizable.
 
 ## Iteration template
 

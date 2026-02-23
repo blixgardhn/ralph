@@ -125,7 +125,7 @@ Default is 30 iterations. Use `--tool amp` or `--tool claude` to override the de
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
-2. Pick the next task where `passes: false` based on dependency/implementation flow
+2. Pick the next task where `passes: false` based on dependency/implementation flow (use `dependsOn` sparingly so tasks stay parallelizable)
 3. Implement that single task
 4. Run quality checks inside containers (typecheck, tests; no host toolchains)
 5. Commit if checks pass
