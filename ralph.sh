@@ -246,6 +246,11 @@ warn_if_target_instructions_present() {
 announce_story_selection() {
   local iteration="$1"
 
+  SELECTED_TASK_ID=""
+  SELECTED_TASK_TITLE=""
+  BLOCKED_IDS=""
+  UNKNOWN_DEP_IDS=""
+
   if ! command -v jq >/dev/null 2>&1; then
     echo "[Ralph] Task selection skipped (jq not installed)." >&2
     return 0
@@ -256,25 +261,68 @@ announce_story_selection() {
     return 0
   fi
 
-  local story_json
-  story_json=$(jq '(.tasks // []) | map(select(.passes != true)) | sort_by((.priority // 2147483647), .id) | .[0]' "$PRD_FILE" 2>/dev/null || true)
+  local selection_json
+  selection_json=$(jq -c '
+    def len0(x): (x // [] | length);
+    def str_len(x): (x // "" | tostring | length);
+    (.tasks // [])
+    | to_entries
+    | map({
+        __idx: .key,
+        id: (.value.id // "<no id>"),
+        title: (.value.title // ""),
+        description: (.value.description // ""),
+        passes: (.value.passes == true),
+        po: (.value.poRank // 2147483647),
+        deps: (.value.dependsOn // []),
+        ac_count: len0(.value.acceptanceCriteria),
+        sub_count: len0(.value.subtasks)
+      }) as $all
+    | ($all | map(.id) | unique) as $ids
+    | ($all | map(.deps // []) | flatten | unique | map(select(($ids | index(.)) | not))) as $unknown
+    | ($all | map(select(.passes)) | map(.id) | map({(.) : true}) | add // {}) as $done_map
+    | ($all
+        | map(select(.passes|not))
+        | map(. + {
+            deps_satisfied: ( (len0(.deps) == 0) or ((.deps | all($done_map[.] // false))) )
+          })
+      ) as $pending
+    | ($pending | map(select(.deps_satisfied)) | sort_by([.po, .__idx, .ac_count, .sub_count, (str_len(.title)+str_len(.description)), .id])) as $unblocked
+    | ($pending | map(select(.deps_satisfied|not))) as $blocked
+    | {
+        selected: ($unblocked[0] // null),
+        blocked: $blocked,
+        unknownDeps: $unknown
+      }
+  ' "$PRD_FILE" 2>/dev/null || true)
 
-  if [ -z "$story_json" ] || [ "$story_json" = "null" ]; then
-    echo "[Ralph] No pending tasks to pick." >&2
+  if [ -z "$selection_json" ]; then
+    echo "[Ralph] Task selection failed (no selection JSON)." >&2
     return 0
   fi
 
-  local story_id story_title story_description
-  story_id=$(echo "$story_json" | jq -r '.id // "<no id>"')
-  story_title=$(echo "$story_json" | jq -r '.title // "<no title>"')
-  story_description=$(echo "$story_json" | jq -r '.description // "<no description>"')
+  SELECTED_TASK_ID=$(echo "$selection_json" | jq -r '.selected.id // ""')
+  SELECTED_TASK_TITLE=$(echo "$selection_json" | jq -r '.selected.title // ""')
+  local selected_description
+  selected_description=$(echo "$selection_json" | jq -r '.selected.description // ""')
+  BLOCKED_IDS=$(echo "$selection_json" | jq -r '(.blocked // []) | map(.id) | join(", ")')
+  UNKNOWN_DEP_IDS=$(echo "$selection_json" | jq -r '(.unknownDeps // []) | join(", ")')
+
+  if [ -n "$UNKNOWN_DEP_IDS" ]; then
+    echo "[Ralph] Warning: dependsOn references unknown task ids: $UNKNOWN_DEP_IDS" >&2
+  fi
+
+  if [ -z "$SELECTED_TASK_ID" ]; then
+    echo "[Ralph] No unblocked tasks to pick; blocked by: ${BLOCKED_IDS:-none}" >&2
+    return 0
+  fi
 
   local selection_block
   selection_block=$(cat <<EOF
 >>> Task Selection (iteration $iteration)
-ID: $story_id
-Title: $story_title
-Description: $story_description
+ID: $SELECTED_TASK_ID
+Title: $SELECTED_TASK_TITLE
+Description: $selected_description
 EOF
 )
 
@@ -283,9 +331,11 @@ EOF
   if [ -n "$PROGRESS_FILE" ]; then
     {
       echo "## $(date --iso-8601=seconds) - Task selection (iteration $iteration)"
-      echo "- ID: $story_id"
-      echo "- Title: $story_title"
-      echo "- Description: $story_description"
+      echo "- ID: $SELECTED_TASK_ID"
+      echo "- Title: $SELECTED_TASK_TITLE"
+      echo "- Description: $selected_description"
+      echo "- Blocked by: ${BLOCKED_IDS:-none}"
+      [ -n "$UNKNOWN_DEP_IDS" ] && echo "- Unknown dependsOn: $UNKNOWN_DEP_IDS"
       echo "---"
     } >> "$PROGRESS_FILE"
   fi
@@ -304,6 +354,11 @@ run_iteration() {
   echo "==============================================================="
 
    announce_story_selection "$iteration"
+
+  if [ -z "$SELECTED_TASK_ID" ]; then
+    echo "[Ralph] No unblocked tasks available; stopping." >&2
+    exit 0
+  fi
 
   local OUTPUT
   local merged_prompt
