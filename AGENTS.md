@@ -22,7 +22,7 @@ When invoked from a target repository that sits alongside this runner, call it a
 
 ### Key Files
 - `ralph.sh` — loop runner
-- `prompt.md` — iteration instructions (canonical for agent behavior)
+- `ralph-specs/prompt.md` — iteration instructions (aligns to this file)
 - `.ralph/tasks.json` — PRD-backed tasks with `passes` status
 - `.ralph/progress.md` — append-only learnings for iterations
 - `tasks.json.example` — PRD format example
@@ -34,7 +34,7 @@ When invoked from a target repository that sits alongside this runner, call it a
 - Append progress to `.ralph/progress.md`; keep Codebase Patterns concise but useful.
 - Update `tasks.json` passes when a story is finished.
 - Logs live in `.ralph/progress.md` only: note key files/functions, commands run (including tests), outcomes, follow-ups.
-- Append suggested improvements to the target repo’s `.ralph/suggested_improvements.md` (kept with the target, not the runner).
+- Append suggested improvements about Ralph itself (runner, prompts, process) to the runner’s `.ralph/suggested_improvements.md`.
 - If required tools/entrypoints/tests or blocking gaps exist, fix or create them first, then proceed.
 - Update README when user-facing behavior changes.
 

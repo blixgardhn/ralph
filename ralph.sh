@@ -11,6 +11,7 @@ OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 export RALPH_ROOT
 TARGET_REPO_ROOT="" # target repo root where code will be generated
+RUNNER_AGENTS_FILE="$RALPH_ROOT/AGENTS.md"
 
 TARGET_REPO_ARG=""
 
@@ -47,6 +48,8 @@ parse_args() {
 
 # shellcheck source=./prd_utils.sh
 source "$RALPH_ROOT/prd_utils.sh"
+# shellcheck source=./timer_utils.sh
+source "$RALPH_ROOT/timer_utils.sh"
 
 validate_tool() {
   if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
@@ -59,7 +62,7 @@ set_paths() {
   local invocation_pwd
   invocation_pwd="$PWD"
 
-  PROMPT_FILE="$RALPH_ROOT/prompt.md"
+  PROMPT_FILE="$RALPH_ROOT/ralph-specs/prompt.md"
 
   local target_repo_input
   if [ -n "$TARGET_REPO_ARG" ]; then
@@ -94,6 +97,74 @@ set_paths() {
   export TARGET_REPO_ROOT
 
   configure_prd_paths "$TARGET_REPO_ROOT"
+}
+
+require_agents_file() {
+  if [ ! -f "$RUNNER_AGENTS_FILE" ]; then
+    echo "Missing AGENTS file at $RUNNER_AGENTS_FILE" >&2
+    exit 1
+  fi
+}
+
+require_prompt_file() {
+  if [ ! -f "$PROMPT_FILE" ]; then
+    echo "Missing prompt file at $PROMPT_FILE" >&2
+    exit 1
+  fi
+}
+
+hash_and_size() {
+  local path="$1"
+  if [ ! -f "$path" ]; then
+    echo "absent"
+    return
+  fi
+  local hash size
+  hash=$(sha1sum "$path" | awk '{print $1}')
+  size=$(stat -c%s "$path" 2>/dev/null || stat -f%z "$path" 2>/dev/null || echo "?")
+  printf "%s/%s" "${hash:0:12}" "$size"
+}
+
+fail_if_target_instructions_present() {
+  local target_agents="$TARGET_REPO_ROOT/AGENTS.md"
+  local target_prompt="$TARGET_REPO_ROOT/ralph/prompt.md"
+
+  if [ -f "$target_agents" ]; then
+    echo "[Ralph] Error: target repo contains AGENTS.md ($target_agents) but runner instructions at $RUNNER_AGENTS_FILE must be used. Remove or rename the target copy." >&2
+    exit 1
+  fi
+
+  if [ -f "$target_prompt" ]; then
+    echo "[Ralph] Error: target repo contains ralph/prompt.md ($target_prompt) but runner prompt at $PROMPT_FILE must be used. Remove or rename the target copy." >&2
+    exit 1
+  fi
+}
+
+log_instruction_fingerprints() {
+  local agents_sig prompt_sig
+  agents_sig=$(hash_and_size "$RUNNER_AGENTS_FILE")
+  prompt_sig=$(hash_and_size "$PROMPT_FILE")
+  echo "[Ralph] Using runner instructions: AGENTS=$agents_sig PROMPT=$prompt_sig" >&2
+}
+
+log_context_resources() {
+  local rules_dotnet rules_python process_contract specs_count specs_hash specs_files
+  rules_dotnet=$(hash_and_size "$RALPH_ROOT/code_generation_rules/RULES-dotnet.md")
+  rules_python=$(hash_and_size "$RALPH_ROOT/code_generation_rules/RULES-python.md")
+  process_contract=$(hash_and_size "$RALPH_ROOT/process_contract")
+
+   specs_count="0"
+   specs_hash="absent"
+   specs_files=""
+   if [ -d "$RALPH_ROOT/ralph-specs" ]; then
+     specs_count=$(find "$RALPH_ROOT/ralph-specs" -maxdepth 1 -type f | wc -l | awk '{print $1}')
+     if [ "$specs_count" -gt 0 ]; then
+       specs_hash=$(find "$RALPH_ROOT/ralph-specs" -maxdepth 1 -type f -exec sha1sum {} + | sha1sum | awk '{print $1}')
+       specs_files=$(cd "$RALPH_ROOT/ralph-specs" && find . -maxdepth 1 -type f -print | sed 's#^./##' | sort | head -n 10 | tr '\n' ',' | sed 's/,$//')
+     fi
+   fi
+
+   echo "[Ralph] Context resources (runner): rules(dotnet)=$rules_dotnet rules(python)=$rules_python process_contract=$process_contract specs=count:$specs_count hash:${specs_hash:0:12} files:$specs_files" >&2
 }
 
 require_prompt() {
@@ -154,8 +225,33 @@ enforce_feature_branch() {
   exit 1
 }
 
+warn_if_target_instructions_present() {
+  local target_agents="$TARGET_REPO_ROOT/AGENTS.md"
+  local target_prompt="$TARGET_REPO_ROOT/ralph/prompt.md"
+  local warned=false
+
+  if [ -f "$target_agents" ]; then
+    echo "[Ralph] Warning: found AGENTS.md in target repo ($target_agents) but runner instructions at $RALPH_ROOT/AGENTS.md will be used." >&2
+    warned=true
+  fi
+
+  if [ -f "$target_prompt" ]; then
+    echo "[Ralph] Warning: found ralph/prompt.md in target repo ($target_prompt) but runner prompt at $PROMPT_FILE will be used." >&2
+    warned=true
+  fi
+
+  if [ "$warned" = true ]; then
+    echo "[Ralph] If you intend to use target copies, run Ralph from the runner directory or adjust invocation." >&2
+  fi
+}
+
 announce_story_selection() {
   local iteration="$1"
+
+  SELECTED_TASK_ID=""
+  SELECTED_TASK_TITLE=""
+  BLOCKED_IDS=""
+  UNKNOWN_DEP_IDS=""
 
   if ! command -v jq >/dev/null 2>&1; then
     echo "[Ralph] Task selection skipped (jq not installed)." >&2
@@ -167,25 +263,68 @@ announce_story_selection() {
     return 0
   fi
 
-  local story_json
-  story_json=$(jq '(.tasks // []) | map(select(.passes != true)) | sort_by((.priority // 2147483647), .id) | .[0]' "$PRD_FILE" 2>/dev/null || true)
+  local selection_json
+  selection_json=$(jq -c '
+    def len0(x): (x // [] | length);
+    def str_len(x): (x // "" | tostring | length);
+    (.tasks // [])
+    | to_entries
+    | map({
+        __idx: .key,
+        id: (.value.id // "<no id>"),
+        title: (.value.title // ""),
+        description: (.value.description // ""),
+        passes: (.value.passes == true),
+        po: (.value.poRank // 2147483647),
+        deps: (.value.dependsOn // []),
+        ac_count: len0(.value.acceptanceCriteria),
+        sub_count: len0(.value.subtasks)
+      }) as $all
+    | ($all | map(.id) | unique) as $ids
+    | ($all | map(.deps // []) | flatten | unique | map(select(($ids | index(.)) | not))) as $unknown
+    | ($all | map(select(.passes)) | map(.id) | map({(.) : true}) | add // {}) as $done_map
+    | ($all
+        | map(select(.passes|not))
+        | map(. + {
+            deps_satisfied: ( (len0(.deps) == 0) or ((.deps | all($done_map[.] // false))) )
+          })
+      ) as $pending
+    | ($pending | map(select(.deps_satisfied)) | sort_by([.po, .__idx, .ac_count, .sub_count, (str_len(.title)+str_len(.description)), .id])) as $unblocked
+    | ($pending | map(select(.deps_satisfied|not))) as $blocked
+    | {
+        selected: ($unblocked[0] // null),
+        blocked: $blocked,
+        unknownDeps: $unknown
+      }
+  ' "$PRD_FILE" 2>/dev/null || true)
 
-  if [ -z "$story_json" ] || [ "$story_json" = "null" ]; then
-    echo "[Ralph] No pending tasks to pick." >&2
+  if [ -z "$selection_json" ]; then
+    echo "[Ralph] Task selection failed (no selection JSON)." >&2
     return 0
   fi
 
-  local story_id story_title story_description
-  story_id=$(echo "$story_json" | jq -r '.id // "<no id>"')
-  story_title=$(echo "$story_json" | jq -r '.title // "<no title>"')
-  story_description=$(echo "$story_json" | jq -r '.description // "<no description>"')
+  SELECTED_TASK_ID=$(echo "$selection_json" | jq -r '.selected.id // ""')
+  SELECTED_TASK_TITLE=$(echo "$selection_json" | jq -r '.selected.title // ""')
+  local selected_description
+  selected_description=$(echo "$selection_json" | jq -r '.selected.description // ""')
+  BLOCKED_IDS=$(echo "$selection_json" | jq -r '(.blocked // []) | map(.id) | join(", ")')
+  UNKNOWN_DEP_IDS=$(echo "$selection_json" | jq -r '(.unknownDeps // []) | join(", ")')
+
+  if [ -n "$UNKNOWN_DEP_IDS" ]; then
+    echo "[Ralph] Warning: dependsOn references unknown task ids: $UNKNOWN_DEP_IDS" >&2
+  fi
+
+  if [ -z "$SELECTED_TASK_ID" ]; then
+    echo "[Ralph] No unblocked tasks to pick; blocked by: ${BLOCKED_IDS:-none}" >&2
+    return 0
+  fi
 
   local selection_block
   selection_block=$(cat <<EOF
 >>> Task Selection (iteration $iteration)
-ID: $story_id
-Title: $story_title
-Description: $story_description
+ID: $SELECTED_TASK_ID
+Title: $SELECTED_TASK_TITLE
+Description: $selected_description
 EOF
 )
 
@@ -194,9 +333,11 @@ EOF
   if [ -n "$PROGRESS_FILE" ]; then
     {
       echo "## $(date --iso-8601=seconds) - Task selection (iteration $iteration)"
-      echo "- ID: $story_id"
-      echo "- Title: $story_title"
-      echo "- Description: $story_description"
+      echo "- ID: $SELECTED_TASK_ID"
+      echo "- Title: $SELECTED_TASK_TITLE"
+      echo "- Description: $selected_description"
+      echo "- Blocked by: ${BLOCKED_IDS:-none}"
+      [ -n "$UNKNOWN_DEP_IDS" ] && echo "- Unknown dependsOn: $UNKNOWN_DEP_IDS"
       echo "---"
     } >> "$PROGRESS_FILE"
   fi
@@ -206,6 +347,8 @@ EOF
 
 run_iteration() {
   local iteration="$1"
+  local iter_start
+  iter_start=$(date +%s)
 
   echo ""
   echo "==============================================================="
@@ -214,14 +357,20 @@ run_iteration() {
 
    announce_story_selection "$iteration"
 
+  if [ -z "$SELECTED_TASK_ID" ]; then
+    echo "[Ralph] No unblocked tasks available; stopping." >&2
+    exit 0
+  fi
+
   local OUTPUT
+  local merged_prompt
+  merged_prompt="$(cat "$RUNNER_AGENTS_FILE"; printf '\n'; cat "$PROMPT_FILE")"
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$PROMPT_FILE" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
   elif [[ "$TOOL" == "claude" ]]; then
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$PROMPT_FILE" 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | claude --dangerously-skip-permissions --print 2>&1 | tee >(cat >&2)) || true
   else
-    PROMPT_TEXT="$(cat "$PROMPT_FILE")"
-    OUTPUT=$(printf "%s" "$PROMPT_TEXT" | opencode run --model "$OPENCODE_MODEL" 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | opencode run --model "$OPENCODE_MODEL" 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
@@ -235,6 +384,11 @@ run_iteration() {
     echo ""
     echo "Ralph completed all tasks at iteration $iteration."
     record_suggestions "$iteration" "complete" "$OUTPUT"
+    local iter_end elapsed loop_elapsed
+    iter_end=$(date +%s)
+    elapsed=$((iter_end - iter_start))
+    loop_elapsed=$((iter_end - LOOP_START_SECS))
+    echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
     exit 0
   fi
 
@@ -242,10 +396,27 @@ run_iteration() {
     echo ""
     echo "Ralph requested stop at iteration $iteration."
     record_suggestions "$iteration" "stopped" "$OUTPUT"
+    local iter_end elapsed loop_elapsed
+    iter_end=$(date +%s)
+    elapsed=$((iter_end - iter_start))
+    loop_elapsed=$((iter_end - LOOP_START_SECS))
+    echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
     exit 0
   fi
 
   record_suggestions "$iteration" "continued" "$OUTPUT"
+  local iter_end elapsed loop_elapsed remaining_tasks completed_tasks
+  iter_end=$(date +%s)
+  elapsed=$((iter_end - iter_start))
+  loop_elapsed=$((iter_end - LOOP_START_SECS))
+  if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
+    remaining_tasks=$(jq '(.tasks // []) | map(select(.passes != true)) | length' "$PRD_FILE" 2>/dev/null || echo 0)
+  else
+    remaining_tasks=0
+  fi
+  completed_tasks=$(compute_completed_tasks "$TOTAL_TASKS" "$remaining_tasks")
+  echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
+  render_progress "$completed_tasks" "$remaining_tasks" "$loop_elapsed"
   echo "Iteration $iteration finished; continuing..."
 }
 
@@ -263,16 +434,23 @@ main() {
   parse_args "$@"
   validate_tool
   set_paths
+  require_agents_file
+  require_prompt_file
+  fail_if_target_instructions_present
+  log_instruction_fingerprints
+  log_context_resources
+  warn_if_target_instructions_present
   require_prd_file
   if [ -x "$RALPH_ROOT/scripts/check_prd.sh" ]; then
     PRD_FILE="$PRD_FILE" SUGGESTIONS_FILE="$SUGGESTIONS_FILE" PROGRESS_FILE="$PROGRESS_FILE" ALLOW_CREATE_SUGGESTIONS=true "$RALPH_ROOT/scripts/check_prd.sh"
   fi
-  require_prompt
   enforce_feature_branch
   archive_prd_if_changed
   init_progress_file
   init_suggestions_file
   validate_prd
+  LOOP_START_SECS=$(date +%s)
+  compute_total_tasks
   run_iterations
 }
 

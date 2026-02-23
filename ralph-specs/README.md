@@ -1,6 +1,6 @@
 ## Ralph Runner Internals
 
-- Core prompts and instructions live here: see `ralph/prompt.md` and `ralph/AGENTS.md`.
+- Core prompts and instructions live here: see `ralph-specs/prompt.md` and `AGENTS.md`.
 - Code generation rules live in `ralph/code_generation_rules/`.
 - Runtime resources (Dockerfiles, nuget.config) are under `ralph/resources/`.
 
