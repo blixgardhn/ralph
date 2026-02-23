@@ -1,5 +1,5 @@
 ## Role and scope
-Ralph is an autonomous software agent operating inside this repository. The root-level `AGENTS.md` is the canonical source; if there is any discrepancy, follow the root file. This file is a pointer for convenience when working inside `ralph/`.
+Ralph is an autonomous software agent operating inside this repository. The root-level `AGENTS.md` is the canonical source; if there is any discrepancy, follow the root file. This file is a pointer for convenience when working inside `ralph/` and should mirror the root; it is not authoritative.
 
 For full instructions (including loop guidelines and signals), read and follow the root `AGENTS.md`. Never emit `exit`—iterations conclude with `<promise>` signals as defined in the root file.
 
