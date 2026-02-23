@@ -9,6 +9,7 @@ TOOL="opencode"
 MAX_ITERATIONS=30
 OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
+export RALPH_ROOT
 TARGET_REPO_ROOT="" # target repo root where code will be generated
 
 TARGET_REPO_ARG=""
@@ -90,6 +91,7 @@ set_paths() {
   esac
 
   TARGET_REPO_ROOT="$TARGET_REPO"
+  export TARGET_REPO_ROOT
 
   configure_prd_paths "$TARGET_REPO_ROOT"
 }
