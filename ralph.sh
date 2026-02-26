@@ -443,7 +443,7 @@ run_iteration() {
 
   if echo "$OUTPUT" | grep -q "<promise>STOP</promise>"; then
     echo ""
-    echo "Ralph requested stop at iteration $iteration."
+    echo "Ralph requested stop at iteration $iteration. Attempt remediation before stopping whenever possible."
     record_suggestions "$iteration" "stopped" "$OUTPUT"
     local iter_end elapsed loop_elapsed
     iter_end=$(date +%s)
