@@ -1,7 +1,7 @@
 ## Role and scope
-Ralph is an autonomous software agent operating inside this repository. The root-level `AGENTS.md` is the canonical source; if there is any discrepancy, follow the root file. This file is a pointer for convenience when working inside `ralph/` and should mirror the root; it is not authoritative.
+Ralph is an autonomous software agent operating inside this repository. 
 
-For full instructions (including loop guidelines and signals), read and follow the root `AGENTS.md`. Never emit `exit`—iterations conclude with `<promise>` signals as defined in the root file.
+For full instructions (including loop guidelines and signals), read and follow the runner `AGENTS.md` under `$RALPH_ROOT/ralph-specs/AGENTS.md` (never from the target). Never emit `exit`—iterations conclude with `<promise>` signals as defined in that file.
 
 Ralph is responsible for:
 - Planning, replanning, and implementing work derived from `.ralph/tasks.json`.
@@ -30,7 +30,7 @@ Ralph is responsible for:
 - File access discipline: read only what is necessary for the current task and acceptance criteria. “Just in case” reads are allowed only with a clear, written rationale (e.g., confirming a dependency or locating a referenced module). Default required reads: `.ralph/tasks.json`, the selected task context, and explicitly referenced specs. Avoid broad/bulk reads; prefer targeted file reads tied to the current subtask.
 
 ## Code generation rules
-`ralph/code_generation_rules/RULES-dotnet.md` and `ralph/code_generation_rules/RULES-python.md` are authoritative. If conflicts arise, record a SPEC GAP and resolve explicitly.
+`ralph-specs/code_generation_rules/RULES-dotnet.md` and `ralph-specs/code_generation_rules/RULES-python.md` (resolved via `$RALPH_ROOT`) are authoritative. If conflicts arise, record a SPEC GAP and resolve explicitly.
 
 ## Spec gaps (must record)
 - If PRD, plan, or code conflict or leave material ambiguity, record a SPEC GAP in progress.md and IMPLEMENTATION_PLAN.md, then resolve before BUILD. Do not proceed silently.

@@ -1,8 +1,9 @@
 ## Ralph Runner Internals
 
-- Core prompts and instructions live here: see `ralph-specs/prompt.md` and `AGENTS.md`.
-- Code generation rules live in `ralph/code_generation_rules/`.
-- Runtime resources (Dockerfiles, nuget.config) are under `ralph/resources/`.
+- Core prompts and instructions live here in the runner: see `ralph-specs/prompt.md` and `AGENTS.md` under `$RALPH_ROOT`.
+- Code generation rules live in `ralph-specs/code_generation_rules/` under the runner root (`$RALPH_ROOT`).
+- Runtime resources (Dockerfiles, nuget.config) are under `ralph/resources/` (runner). Target repos should copy what they need.
+- Nothing is written inside `$RALPH_ROOT` at runtime; all iteration artifacts (tasks, progress, suggestions) belong under the target repo at `$TARGET_REPO_ROOT/.ralph/`.
 
 ### verify.sh
 

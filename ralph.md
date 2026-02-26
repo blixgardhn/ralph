@@ -32,7 +32,7 @@ High-level guide to the Ralph loop runner script used to orchestrate autonomous 
 ## Key behaviors and paths
 - Resolves `PROMPT_FILE` to `prompt.md` in the runner; PRD/progress paths are configured via `prd_utils.sh` based on `--target-repo`.
 - Archives old PRDs when the current one changes before starting a run (see `archive_prd_if_changed` in `prd_utils.sh`).
-- Initializes `.ralph/progress.md` and `.ralph/suggested_improvements.md` in the target repo if absent.
+- Initializes `.ralph/progress.md` and `.ralph/suggested_improvements.md` in the target repo if absent (never writes inside `RALPH_ROOT`).
 - Exits with clear errors when validation fails (invalid tool, missing PRD, target repo path invalid, branch enforcement issues).
 
 ## Quick start examples
