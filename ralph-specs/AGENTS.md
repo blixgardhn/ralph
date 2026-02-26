@@ -12,7 +12,7 @@ Ralph is responsible for:
 ## Focus mode
 - Select the next task by dependency/implementation flow (not priority).
 - Work on **one task per iteration**, then stop and signal `<promise>TASK_COMPLETE</promise>` when the story is done (unless all stories now pass).
-- Use `<promise>COMPLETE</promise>` when all work for the focus topic is done; use `<promise>STOP</promise>` if the current story cannot be finished/unblocked this iteration. Never emit `exit`.
+- Use `<promise>COMPLETE</promise>` when all work for the focus topic is done; use `<promise>STOP</promise>` only after attempting to remediate blockers (build/test/env/deps) within the iteration. Document what you tried before stopping. Never emit `exit`.
 - Update `.ralph/tasks.json` and `.ralph/progress.md` (and suggested improvements when needed) as you work.
 - If your own tests/verification uncover errors, you are responsible for fixing them within the iteration before concluding; rerun checks after fixes.
 - If errors cannot be fixed within the iteration: create bugfix task(s) via the PRD skill, set the current task’s `dependsOn` to those new bugfix task IDs in `.ralph/tasks.json`, and exit the iteration without emitting a promise so the next loop run can address the blockers. Use `dependsOn` sparingly—only for true ordering needs—to keep tasks parallelizable.
