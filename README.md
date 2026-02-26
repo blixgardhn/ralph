@@ -10,6 +10,11 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 All project dependency installation, linting, testing, builds, and database seeding must run inside containers (Docker/Podman/Compose). Keep the host clean of project toolchains. For images that need outbound network access, include the certificate install RUN block from `ralph/resources/Dockerfile.dotnet`/`ralph/resources/Dockerfile.template` to ensure proxy/interception certs are trusted. Do not link directly to files in `ralph/resources`; copy the needed content into the target project because that code has no access to runner-only files (they are not secret).
 
+**Path boundaries (very important):** On startup Ralph sets two roots and keeps them separate:
+- `RALPH_ROOT`: the runner checkout; all runner-owned instructions, prompts, rules, and resources live here. Nothing is written inside `RALPH_ROOT` at runtime.
+- `TARGET_REPO_ROOT`: the project repository you pass via `--target-repo`; all PRD/task/progress/suggestions files live under this root (e.g., `TARGET_REPO_ROOT/.ralph/tasks.json`).
+Ralph reads runner files only from `RALPH_ROOT` and writes all iteration artifacts only under `TARGET_REPO_ROOT`. Avoid mixing paths to prevent missing-file confusion at runtime. Do not target the runner repo itself as the `--target-repo`; the script will exit to prevent writing into `RALPH_ROOT`.
+
 ## Prerequisites
 
 - Docker or Podman with Compose support (all installs/tests/builds run in containers)
@@ -40,6 +45,8 @@ chmod +x scripts/ralph/ralph.sh
 ```
 
 Run project commands through container entrypoints (docker compose / podman compose). Keep project dependencies out of the host.
+
+Minimal dry run: a sample PRD lives at `.ralph/tasks.json` with `branchName` `ralph/example`. Switch to that branch, then run `./ralph.sh --target-repo $(pwd)` to exercise the loop end-to-end.
 
 When you start a new PRD (or edit the current `tasks.json`), Ralph auto-archives the previous run’s `tasks.json` and `progress.md` into `archive/YYYY-MM-DD-<branch>/` and resets `progress.md` so each requirement set stays isolated.
 
@@ -131,7 +138,7 @@ Ralph will:
 5. Commit if checks pass
 6. Update `.ralph/tasks.json` to mark the task as `passes: true`
 7. Append learnings to `.ralph/progress.md`
-8. Capture Ralph-runner improvement ideas in the runner’s `.ralph/suggested_improvements.md` (not target project tweaks)
+8. Capture Ralph-runner improvement ideas in the target repo’s `.ralph/suggested_improvements.md` (not in the runner checkout)
 9. Repeat until all tasks pass or max iterations reached
 
 ## Key Files
@@ -143,9 +150,33 @@ Ralph will:
 | `.ralph/tasks.json` | PRD-backed tasks with `passes` status (the task list) |
 | `.ralph/progress.md` | Append-only learnings for future iterations |
 | `tasks.json.example` | Example PRD format for reference |
-| `.ralph/suggested_improvements.md` | Suggestions to improve the Ralph runner/prompts/process (lives with the runner) |
+| `.ralph/suggested_improvements.md` | Suggestions to improve the Ralph runner/prompts/process (lives in the target repo; do not write inside the runner) |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph_prd/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
+
+## Documentation Dependency Map
+
+```mermaid
+graph LR
+  README[README.md]
+  RALPH_SH[ralph.sh]
+  AGENTS[ralph-specs/AGENTS.md]
+  PROMPT[ralph-specs/prompt.md]
+  RULES_MD[ralph-specs/code_generation_rules/RULES.md]
+  RULES_DOTNET[ralph-specs/code_generation_rules/RULES-dotnet.md]
+  RULES_PY[ralph-specs/code_generation_rules/RULES-python.md]
+
+  README --> RALPH_SH
+  RALPH_SH --> PROMPT
+  RALPH_SH --> AGENTS
+  RALPH_SH --> RULES_MD
+  RALPH_SH --> RULES_DOTNET
+  RALPH_SH --> RULES_PY
+  AGENTS --> RULES_MD
+  AGENTS --> RULES_DOTNET
+  AGENTS --> RULES_PY
+  PROMPT --> AGENTS
+```
 
 ## Critical Concepts
 

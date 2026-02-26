@@ -11,7 +11,10 @@ OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 export RALPH_ROOT
 TARGET_REPO_ROOT="" # target repo root where code will be generated
-RUNNER_AGENTS_FILE="$RALPH_ROOT/AGENTS.md"
+export TARGET_REPO_ROOT
+RUNNER_AGENTS_FILE="$RALPH_ROOT/ralph-specs/AGENTS.md"
+RESOLVED_AGENTS_FILE=""
+RESOLVED_PROMPT_FILE=""
 
 TARGET_REPO_ARG=""
 
@@ -87,7 +90,7 @@ set_paths() {
 
   case "$TARGET_REPO" in
     "$RALPH_ROOT"|"$RALPH_ROOT"/*)
-      echo "TARGET_REPO must not be the Ralph runner directory; point to the target repo containing .ralph." >&2
+      echo "TARGET_REPO must not be the Ralph runner directory; point to a project repo containing .ralph." >&2
       echo "Resolved target: $TARGET_REPO" >&2
       exit 1
       ;;
@@ -100,17 +103,57 @@ set_paths() {
 }
 
 require_agents_file() {
+  # Soft requirement: prefer runner AGENTS, but do not stop the loop if missing.
   if [ ! -f "$RUNNER_AGENTS_FILE" ]; then
-    echo "Missing AGENTS file at $RUNNER_AGENTS_FILE" >&2
-    exit 1
+    echo "[Ralph][warn] Missing runner AGENTS at $RUNNER_AGENTS_FILE; will look for a target fallback." >&2
+    return 1
   fi
+  return 0
+}
+
+require_runner_specs_dir() {
+  local specs_dir="$RALPH_ROOT/ralph-specs"
+  if [ ! -d "$specs_dir" ]; then
+    echo "[Ralph][warn] Runner specs directory missing at $specs_dir; proceeding without appended specs." >&2
+    return 1
+  fi
+  return 0
+}
+
+collect_ralph_specs() {
+  local specs_dir="$RALPH_ROOT/ralph-specs"
+  if [ ! -d "$specs_dir" ]; then
+    echo "[Ralph][warn] Specs directory $specs_dir not found; skipping specs append." >&2
+    return
+  fi
+
+  # Deterministic ordering: limit to core instruction files and sort by relative path.
+  local files
+  IFS=$'\n' read -r -d '' -a files < <(printf "%s\n" \
+    "$specs_dir/AGENTS.md" \
+    "$specs_dir/prompt.md" \
+    "$specs_dir/code_generation_rules/RULES.md" \
+    "$specs_dir/code_generation_rules/RULES-dotnet.md" \
+    "$specs_dir/code_generation_rules/RULES-python.md" \
+    "$specs_dir/README.md" 2>/dev/null | awk 'NF' | sort -u && printf '\0') || true
+
+  local file rel
+  for file in "${files[@]}"; do
+    [ -f "$file" ] || continue
+    rel=${file#"$RALPH_ROOT/"}
+    printf '\n### Begin %s\n' "$rel"
+    cat "$file"
+    printf '\n### End %s\n' "$rel"
+  done
 }
 
 require_prompt_file() {
+  # Soft requirement: prefer runner prompt, but do not stop the loop if missing.
   if [ ! -f "$PROMPT_FILE" ]; then
-    echo "Missing prompt file at $PROMPT_FILE" >&2
-    exit 1
+    echo "[Ralph][warn] Missing runner prompt at $PROMPT_FILE; will look for a target fallback." >&2
+    return 1
   fi
+  return 0
 }
 
 hash_and_size() {
@@ -125,46 +168,43 @@ hash_and_size() {
   printf "%s/%s" "${hash:0:12}" "$size"
 }
 
-fail_if_target_instructions_present() {
+resolve_instruction_files() {
   local target_agents="$TARGET_REPO_ROOT/AGENTS.md"
   local target_prompt="$TARGET_REPO_ROOT/ralph/prompt.md"
 
-  if [ -f "$target_agents" ]; then
-    echo "[Ralph] Error: target repo contains AGENTS.md ($target_agents) but runner instructions at $RUNNER_AGENTS_FILE must be used. Remove or rename the target copy." >&2
-    exit 1
+  RESOLVED_AGENTS_FILE=""
+  RESOLVED_PROMPT_FILE=""
+
+  if [ -f "$RUNNER_AGENTS_FILE" ]; then
+    RESOLVED_AGENTS_FILE="$RUNNER_AGENTS_FILE"
+    if [ -f "$target_agents" ]; then
+      echo "[Ralph][warn] Target has AGENTS at $target_agents; runner copy will be used." >&2
+    fi
+  elif [ -f "$target_agents" ]; then
+    RESOLVED_AGENTS_FILE="$target_agents"
+    echo "[Ralph][warn] Using target AGENTS fallback at $target_agents (runner copy missing)." >&2
+  else
+    echo "[Ralph][warn] No AGENTS.md found (runner or target); prompt will include a placeholder." >&2
   fi
 
-  if [ -f "$target_prompt" ]; then
-    echo "[Ralph] Error: target repo contains ralph/prompt.md ($target_prompt) but runner prompt at $PROMPT_FILE must be used. Remove or rename the target copy." >&2
-    exit 1
+  if [ -f "$PROMPT_FILE" ]; then
+    RESOLVED_PROMPT_FILE="$PROMPT_FILE"
+    if [ -f "$target_prompt" ]; then
+      echo "[Ralph][warn] Target has ralph/prompt.md at $target_prompt; runner copy will be used." >&2
+    fi
+  elif [ -f "$target_prompt" ]; then
+    RESOLVED_PROMPT_FILE="$target_prompt"
+    echo "[Ralph][warn] Using target prompt fallback at $target_prompt (runner copy missing)." >&2
+  else
+    echo "[Ralph][warn] No prompt file found (runner or target); prompt will include a placeholder." >&2
   fi
 }
 
 log_instruction_fingerprints() {
   local agents_sig prompt_sig
-  agents_sig=$(hash_and_size "$RUNNER_AGENTS_FILE")
-  prompt_sig=$(hash_and_size "$PROMPT_FILE")
-  echo "[Ralph] Using runner instructions: AGENTS=$agents_sig PROMPT=$prompt_sig" >&2
-}
-
-log_context_resources() {
-  local rules_dotnet rules_python process_contract specs_count specs_hash specs_files
-  rules_dotnet=$(hash_and_size "$RALPH_ROOT/code_generation_rules/RULES-dotnet.md")
-  rules_python=$(hash_and_size "$RALPH_ROOT/code_generation_rules/RULES-python.md")
-  process_contract=$(hash_and_size "$RALPH_ROOT/process_contract")
-
-   specs_count="0"
-   specs_hash="absent"
-   specs_files=""
-   if [ -d "$RALPH_ROOT/ralph-specs" ]; then
-     specs_count=$(find "$RALPH_ROOT/ralph-specs" -maxdepth 1 -type f | wc -l | awk '{print $1}')
-     if [ "$specs_count" -gt 0 ]; then
-       specs_hash=$(find "$RALPH_ROOT/ralph-specs" -maxdepth 1 -type f -exec sha1sum {} + | sha1sum | awk '{print $1}')
-       specs_files=$(cd "$RALPH_ROOT/ralph-specs" && find . -maxdepth 1 -type f -print | sed 's#^./##' | sort | head -n 10 | tr '\n' ',' | sed 's/,$//')
-     fi
-   fi
-
-   echo "[Ralph] Context resources (runner): rules(dotnet)=$rules_dotnet rules(python)=$rules_python process_contract=$process_contract specs=count:$specs_count hash:${specs_hash:0:12} files:$specs_files" >&2
+  agents_sig=$(hash_and_size "${RESOLVED_AGENTS_FILE:-$RUNNER_AGENTS_FILE}")
+  prompt_sig=$(hash_and_size "${RESOLVED_PROMPT_FILE:-$PROMPT_FILE}")
+  echo "[Ralph] Using instructions: AGENTS=$agents_sig PROMPT=$prompt_sig" >&2
 }
 
 require_prompt() {
@@ -228,20 +268,13 @@ enforce_feature_branch() {
 warn_if_target_instructions_present() {
   local target_agents="$TARGET_REPO_ROOT/AGENTS.md"
   local target_prompt="$TARGET_REPO_ROOT/ralph/prompt.md"
-  local warned=false
 
   if [ -f "$target_agents" ]; then
-    echo "[Ralph] Warning: found AGENTS.md in target repo ($target_agents) but runner instructions at $RALPH_ROOT/AGENTS.md will be used." >&2
-    warned=true
+    echo "[Ralph][warn] Target repo has AGENTS at $target_agents." >&2
   fi
 
   if [ -f "$target_prompt" ]; then
-    echo "[Ralph] Warning: found ralph/prompt.md in target repo ($target_prompt) but runner prompt at $PROMPT_FILE will be used." >&2
-    warned=true
-  fi
-
-  if [ "$warned" = true ]; then
-    echo "[Ralph] If you intend to use target copies, run Ralph from the runner directory or adjust invocation." >&2
+    echo "[Ralph][warn] Target repo has ralph/prompt.md at $target_prompt." >&2
   fi
 }
 
@@ -364,7 +397,23 @@ run_iteration() {
 
   local OUTPUT
   local merged_prompt
-  merged_prompt="$(cat "$RUNNER_AGENTS_FILE"; printf '\n'; cat "$PROMPT_FILE")"
+  local agents_block prompt_block specs_block
+
+  if [ -n "$RESOLVED_AGENTS_FILE" ] && [ -f "$RESOLVED_AGENTS_FILE" ]; then
+    agents_block=$(cat "$RESOLVED_AGENTS_FILE")
+  else
+    agents_block="### Missing AGENTS instructions\nNo AGENTS.md was found; proceed with caution."
+  fi
+
+  if [ -n "$RESOLVED_PROMPT_FILE" ] && [ -f "$RESOLVED_PROMPT_FILE" ]; then
+    prompt_block=$(cat "$RESOLVED_PROMPT_FILE")
+  else
+    prompt_block="### Missing prompt instructions\nNo prompt.md was found; proceed with caution."
+  fi
+
+  specs_block=$(collect_ralph_specs)
+
+  merged_prompt="$(printf "%s\n\n%s\n%s" "$agents_block" "$prompt_block" "$specs_block")"
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
   elif [[ "$TOOL" == "claude" ]]; then
@@ -434,12 +483,14 @@ main() {
   parse_args "$@"
   validate_tool
   set_paths
-  require_agents_file
-  require_prompt_file
-  fail_if_target_instructions_present
-  log_instruction_fingerprints
-  log_context_resources
+  require_runner_specs_dir || true
+  require_agents_file || true
+  require_prompt_file || true
   warn_if_target_instructions_present
+  resolve_instruction_files
+  echo "[Ralph] Roots: RALPH_ROOT=$RALPH_ROOT TARGET_REPO_ROOT=$TARGET_REPO_ROOT" >&2
+  echo "[Ralph] Instruction lookup: runner files live under RALPH_ROOT; target-specific files live under TARGET_REPO_ROOT/.ralph" >&2
+  log_instruction_fingerprints
   require_prd_file
   if [ -x "$RALPH_ROOT/scripts/check_prd.sh" ]; then
     PRD_FILE="$PRD_FILE" SUGGESTIONS_FILE="$SUGGESTIONS_FILE" PROGRESS_FILE="$PROGRESS_FILE" ALLOW_CREATE_SUGGESTIONS=true "$RALPH_ROOT/scripts/check_prd.sh"

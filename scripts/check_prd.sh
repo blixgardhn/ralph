@@ -82,4 +82,31 @@ if [[ -n "$missing_boilerplate" ]]; then
   exit 1
 fi
 
+missing_tests_ac=$(jq -r '
+  .tasks[] | select(
+    ([.acceptanceCriteria[]?] | map(ascii_downcase) | map(ltrimstr(" ")) | map(rtrimstr(" ")) | map(gsub("\\s+"; " ")) | map(test("test")) | any) | not
+  ) | .id' "$PRD_FILE")
+
+if [[ -n "$missing_tests_ac" ]]; then
+  echo "[check_prd] Tasks missing any acceptance criterion mentioning tests" >&2
+  echo "$missing_tests_ac" >&2
+  exit 1
+fi
+
+unknown_dep_ids=$(jq -r '
+  (.tasks // []) as $tasks
+  | ($tasks | map(.id) | unique) as $ids
+  | $tasks[]
+  | {id: .id, deps: (.dependsOn // [])}
+  | select(.deps | length > 0)
+  | {id, missing: (.deps | map(select($ids | index(.) | not)))}
+  | select(.missing | length > 0)
+  | "\(.id) -> \(.missing | join(", "))"' "$PRD_FILE")
+
+if [[ -n "$unknown_dep_ids" ]]; then
+  echo "[check_prd] dependsOn references unknown task ids:" >&2
+  echo "$unknown_dep_ids" >&2
+  exit 1
+fi
+
 echo "[check_prd] OK: $PRD_FILE"
