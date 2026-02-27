@@ -26,12 +26,13 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
 4. After the first full pass, review the PRD task list and split any broad tasks into focused jobs that are deterministic, testable, individually committable, and small enough for a junior developer to pick up without needing deep system or domain knowledge.
 5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria).
 6. Keep tasks minimal and focused; split aggressively so each task fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one task.
-7. Before finalizing the PRD, take a high-level pass over all tasks to ensure they fit together coherently and reorder them based on dependencies and implementation flow; the order must make sense end-to-end.
-8. During that pass, if any subtasks are large enough to stand alone, promote them to tasks, then re-run the overview and reorder as needed.
-9. After creating tasks, sanity-check each one for clarity and scope: a non-expert should be able to execute it without learning more of the system or domain than necessary.
-10. If the project lacks a minimal scaffold (or more), include an initial task to create it so later tasks have a foundation.
-11. For each task, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that task.
-12. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
+7. Ensure the PRD depth and task list size mirror the complexity of the application being specified; right-size scope so complexity is captured without over- or under-splitting.
+8. Before finalizing the PRD, take a high-level pass over all tasks to ensure they fit together coherently and reorder them based on dependencies and implementation flow; the order must make sense end-to-end.
+9. During that pass, if any subtasks are large enough to stand alone, promote them to tasks, then re-run the overview and reorder as needed.
+10. After creating tasks, sanity-check each one for clarity and scope: a non-expert should be able to execute it without learning more of the system or domain than necessary.
+11. If the project lacks a minimal scaffold (or more), include an initial task to create it so later tasks have a foundation.
+12. For each task, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that task.
+13. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
 
 **Important:** Do NOT implement the feature. Deliver specs only.
 
