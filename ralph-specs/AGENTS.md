@@ -19,7 +19,9 @@ Ralph is responsible for:
 
 ## Branching and commits
 - Use a dedicated feature branch per story (e.g., `ralph/<StoryID>`); never commit directly to main/master.
+- When running from a PRD, create exactly one feature branch per PRD (e.g., `ralph/prd-<PRD_ID>`) and keep all iterations for that PRD on that branch unless the user requests otherwise.
 - Commit only after verification passes (prefer `ralph/verify.sh`; otherwise `pnpm typecheck && pnpm test`). No WIP commits.
+- During a PRD-driven iteration, make at least one commit before finishing the iteration whenever changes were made and verification has passed.
 
 ## Browser verification
 - For stories requiring manual/browser checks, add a "Manual Verification Steps" section to progress.md and do not mark acceptance criteria done without explicit human confirmation.

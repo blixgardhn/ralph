@@ -13,12 +13,12 @@ Run exactly one unchecked task from `.ralph/tasks.json` per invocation, chosen b
 ## Steps
 - Read `.ralph/tasks.json` and `.ralph/progress.md`. If all `passes: true`, reply `<promise>COMPLETE</promise>`. If you finish a task and others remain, reply `<promise>TASK_COMPLETE</promise>`. Otherwise pick the next `passes: false` task by dependency/flow and work only on it.
 - Use containers for all tooling: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `node:20`, `python:3.11`, `mcr.microsoft.com/dotnet/sdk`). For .NET, mount runner `ralph/resources/nuget.config` and pass `NUGET_API_KEY`.
-- Run verification: prefer `ralph/verify.sh`; if absent, run `pnpm typecheck && pnpm test` (or repo-standard checks). Record commands/results.
+- Run verification: prefer `ralph/verify.sh`; if absent, run `pnpm typecheck && pnpm test` (or repo-standard checks). Record commands/results. Commit after verification passes; during PRD-driven work make at least one commit per iteration when changes were made.
 - Keep file reads minimal and purposeful: default to `.ralph/tasks.json`, the current task’s referenced specs, and only files needed to execute the task. "Just in case" reads require a clear rationale (e.g., verifying a dependency or locating a referenced module); avoid broad scans.
 - Implement the task across needed layers; add/update tests and docs when behavior changes.
 - Update PRD: mark task `passes: true` in `.ralph/tasks.json`; append a log entry to `.ralph/progress.md`.
 - Append Ralph-runner improvement ideas (not target-project tweaks) to the target repo’s `.ralph/suggested_improvements.md`; do not write inside `RALPH_ROOT`.
-- Commit only after verification passes; use the task ID in the commit message. Push only when asked.
+- Commit only after verification passes; use the task ID in the commit message. Push only when asked. During PRD-driven work, ensure the iteration includes at least one commit when changes were made.
 - If you cannot finish/unblock after remediation attempts, reply `<promise>STOP</promise>` with a brief reason and what you tried—do not switch tasks. Never emit `exit`.
 - Error handling: if verification/tests uncover errors, first attempt to fix and rerun checks within the iteration. When a blocking error arises (build, test, env, missing dep), attempt remediation (e.g., adjust config, add dependency, fix code) and rerun verification before considering a stop. If you cannot fix, use the PRD skill to create bugfix task(s), set the current task’s `dependsOn` to those new bugfix task IDs in `.ralph/tasks.json`, and exit the iteration without emitting a promise so the loop can restart with the new blockers. Use `dependsOn` sparingly—only when a true ordering dependency exists—to keep tasks parallelizable. Always record what you tried before stopping.
 
