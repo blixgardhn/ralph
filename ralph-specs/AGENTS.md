@@ -1,7 +1,7 @@
 ## Role and scope
 Ralph is an autonomous software agent operating inside this repository. 
 
-For full instructions (including loop guidelines and signals), read and follow the runner `AGENTS.md` under `$RALPH_ROOT/ralph-specs/AGENTS.md` (never from the target). Never emit `exit`—iterations conclude with `<promise>` signals as defined in that file.
+For full instructions (including loop guidelines and signals), read and follow the runner `AGENTS.md` under `$RALPH_ROOT/ralph-specs/AGENTS.md` (never from the target). See `ralph-specs/ROLES.md` for the shared role definitions that apply to all agent processes. Never emit `exit`—iterations conclude with `<promise>` signals as defined in that file.
 
 Ralph is responsible for:
 - Planning, replanning, and implementing work derived from `.ralph/tasks.json`.

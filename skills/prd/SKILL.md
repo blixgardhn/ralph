@@ -12,17 +12,24 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
 
 ## The Job
 
-1. Receive a feature or change request (assume PRD + tasks.json is needed unless the user explicitly opts out)
-2. Ask 3-5 essential clarifying questions (lettered options)
-3. Generate the PRD in markdown
-4. Generate the matching `.ralph/tasks.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow)
-5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria)
+1. Run the role flow (see `ralph-specs/ROLES.md`) while planning:
+   - Clarification Agent: ask 3–5 decisive lettered questions (A/B/C/D + Other) to disambiguate.
+   - Problem & Context Analyst: synthesize problem, personas, JTBD, goals, constraints, success metrics, non-goals.
+   - Scope & Story Engineer: break into 6–10 small, committable, dependency-ordered tasks with concrete ACs/boilerplate.
+   - Feasibility & Constraints Advisor: flag NFRs, tech debt, seed data, scaffold gaps; suggest splits/promotions and added ACs/FRs.
+   - Quality & Coherence Reviewer: stress-test PRD draft + JSON for contradictions, vagueness, ordering, sync issues; list fixes.
+   - Final Formatter & Archivist: produce final PRD markdown + synced `.ralph/tasks.json`; apply archive rules if prior tasks exist.
+2. Generate the PRD in markdown using clarified inputs and the role outputs.
+3. Generate the matching `.ralph/tasks.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow).
+4. After the first full pass, review the PRD task list and split any broad tasks into focused jobs that are deterministic, testable, individually committable, and small enough for a junior developer to pick up without needing deep system or domain knowledge.
+5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria).
 6. Keep tasks minimal and focused; split aggressively so each task fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one task.
 7. Before finalizing the PRD, take a high-level pass over all tasks to ensure they fit together coherently and reorder them based on dependencies and implementation flow; the order must make sense end-to-end.
 8. During that pass, if any subtasks are large enough to stand alone, promote them to tasks, then re-run the overview and reorder as needed.
-9. If the project lacks a minimal scaffold (or more), include an initial task to create it so later tasks have a foundation.
-10. For each task, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that task.
-11. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
+9. After creating tasks, sanity-check each one for clarity and scope: a non-expert should be able to execute it without learning more of the system or domain than necessary.
+10. If the project lacks a minimal scaffold (or more), include an initial task to create it so later tasks have a foundation.
+11. For each task, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that task.
+12. Add a dedicated documentation task when needed to produce or update `README.md`; keep it concise yet descriptive and include a Mermaid diagram where possible for system visualization.
 
 **Important:** Do NOT implement the feature. Deliver specs only.
 
