@@ -20,6 +20,7 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
    - Quality & Coherence Reviewer: stress-test PRD draft + JSON for contradictions, vagueness, ordering, sync issues; list fixes.
    - Final Formatter & Archivist: produce final PRD markdown + synced `.ralph/tasks.json`; apply archive rules if prior tasks exist.
    - Let each role look over the PRD draft and resulting task list; incorporate their feedback before finalizing. Each role may rewrite the task list as needed (reorder, add, remove, split, merge, or rewrite tasks) to improve clarity, feasibility, and junior executability.
+   - Before finishing, have each role analyze the current PRD and tasks list, output their improvement suggestions, and iterate those improvements into the PRD and tasks until all roles are satisfied with the tasks list.
 2. Generate the PRD in markdown using clarified inputs and the role outputs.
 3. Generate the matching `.ralph/tasks.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow).
 4. After the first full pass, review the PRD task list and split any broad tasks into focused jobs that are deterministic, testable, individually committable, and small enough for a junior developer to pick up without needing deep system or domain knowledge.
