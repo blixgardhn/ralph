@@ -12,7 +12,7 @@ Run exactly one unchecked task from `.ralph/tasks.json` per invocation, chosen b
 
 ## Steps
 - Read `.ralph/tasks.json` and `.ralph/progress.md`. If all `passes: true`, reply `<promise>COMPLETE</promise>`. If you finish a task and others remain, reply `<promise>TASK_COMPLETE</promise>`. Otherwise pick the next `passes: false` task by dependency/flow and work only on it.
-- Use containers for all tooling: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `node:20`, `python:3.11`, `mcr.microsoft.com/dotnet/sdk`). For .NET, mount runner `ralph/resources/nuget.config` and pass `NUGET_API_KEY`.
+- Use containers for all tooling: `docker run --rm -v "$PWD":/work -w /work <image> <tool> ...` (e.g., `node:20`, `python:3.11`, `mcr.microsoft.com/dotnet/sdk`). For .NET, mount runner `ralph/resources/nuget.config` and pass `NUGET_API_KEY`. Never install tools or dependencies on the host; all installs and tests run inside containers.
 - Run verification: prefer `ralph/verify.sh`; if absent, run `pnpm typecheck && pnpm test` (or repo-standard checks). Record commands/results. Commit after verification passes; during PRD-driven work make at least one commit per iteration when changes were made.
 - Keep file reads minimal and purposeful: default to `.ralph/tasks.json`, the current task’s referenced specs, and only files needed to execute the task. "Just in case" reads require a clear rationale (e.g., verifying a dependency or locating a referenced module); avoid broad scans.
 - Implement the task across needed layers; add/update tests and docs when behavior changes.
