@@ -124,16 +124,46 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 
 ---
 
-### Role 6: Final Formatter, Archivist & Orchestrator
+### Role 6: Domain Expert (Subject-Matter Reviewer)
+
+| Attribute | Detail |
+| --- | --- |
+| **Personality / Tone** | Authoritative practitioner, detail-oriented, user-empathetic |
+| **Goal** | Validate that the PRD accurately models the real-world domain: correct terminology, complete workflows, realistic edge cases, and acceptance criteria that reflect how actual users operate in the problem space |
+| **When** | After QA review — final substantive review before formatting. Ensures the solution is not just internally consistent but *domain-correct* |
+| **Trigger** | "You are a domain expert in the problem space this application addresses. Review the PRD, tasks, and ACs. Flag any domain inaccuracies, missing workflows, incorrect terminology, unrealistic assumptions, or gaps that would cause the product to fail real-world usage." |
+
+**Required inputs:** All prior role docs (1–5), current PRD draft, current tasks.json draft, any domain context from the user request.
+**Required outputs:**
+- Domain accuracy assessment (terminology, workflows, data models).
+- Missing domain workflows or edge cases that real users would encounter.
+- Corrections to acceptance criteria that misrepresent domain behavior.
+- Domain-specific risks (regulatory, compliance, industry conventions).
+- Suggested task additions or AC rewrites to close domain gaps.
+
+**Domain review checklist (must address each):**
+- [ ] Terminology — domain terms used correctly and consistently throughout PRD and ACs
+- [ ] Workflows — all critical user workflows for the domain are represented; no happy-path-only coverage
+- [ ] Edge cases — domain-specific edge cases identified (e.g., boundary conditions, exception flows, seasonal/temporal factors)
+- [ ] Data model — entities, relationships, and constraints reflect real-world domain rules
+- [ ] Acceptance criteria — ACs test real-world usage, not just technical correctness
+- [ ] Regulatory/compliance — any industry-specific regulations, standards, or conventions flagged
+- [ ] User expectations — feature behavior aligns with what domain practitioners would expect
+
+**Role doc sections:** Inputs consumed, Decisions & changes, Task rewrites (domain-driven additions, AC corrections, workflow gaps), Risks & open questions, Rationale.
+
+---
+
+### Role 7: Final Formatter, Archivist & Orchestrator
 
 | Attribute | Detail |
 | --- | --- |
 | **Personality / Tone** | Professional writer, meticulous, decisive |
 | **Goal** | Produce clean markdown PRD + perfectly synced tasks.json + handle archiving; also resolve inter-role conflicts and declare loop completion |
-| **When** | Last step — only after Reviewer approves or after fixes are applied |
+| **When** | Last step — only after Domain Expert and Reviewer approve or after fixes are applied |
 | **Trigger** | "Format final PRD markdown exactly per template. Then generate matching tasks.json. Apply archive rules if existing unfinished tasks.json exists. Resolve any remaining inter-role conflicts." |
 
-**Required inputs:** All prior role docs (1–5), final PRD draft, final tasks.json draft.
+**Required inputs:** All prior role docs (1–6), final PRD draft, final tasks.json draft.
 **Required outputs:**
 - Final PRD markdown and tasks.json (synced).
 - Archive actions taken (if any).
@@ -151,6 +181,7 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
   - [x] Scope & Story Engineer — no objections
   - [x] Feasibility & Constraints Advisor — no objections
   - [x] Quality & Coherence Reviewer — no objections
+  - [x] Domain Expert — no objections
   - [x] Final Formatter & Orchestrator — sign-off complete
   ```
 - **Loop completion:** Declare the review loop done when a full pass produces no new material issues (only minor wording/formatting tweaks remain). Maximum two review iterations; if unresolved conflicts remain after two passes, the Orchestrator decides and documents the decision.
@@ -179,7 +210,7 @@ Not every PRD requires the same depth of analysis. Right-size the role processin
 | --- | --- | --- |
 | **Trivial** (config tweak, rename, single-endpoint) | Mini-PRD path: lighter passes, 3–4 tasks. One review iteration is acceptable if no issues surface. | 1 |
 | **Standard** (typical feature, 6–10 tasks) | Full role flow. Two review iterations if needed. | 1–2 |
-| **Complex** (multi-surface: DB + API + UI + docs, >10 tasks) | Deep passes per role. Feasibility and QA roles should be thorough. Two review iterations expected. | 2 |
+| **Complex** (multi-surface: DB + API + UI + docs, >10 tasks) | Deep passes per role. Feasibility, QA, and Domain Expert roles should be thorough. Two review iterations expected. | 2 |
 
 When using the mini-PRD path, document the rationale in the PRD introduction. All other rules (sync checklist, mandatory ACs, per-role docs, handoff contract) still apply regardless of depth.
 

@@ -22,6 +22,7 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
    - **Scope & Story Engineer:** break into 6–10 small, committable, dependency-ordered tasks with concrete ACs/boilerplate.
    - **Feasibility & Constraints Advisor:** flag NFRs, tech debt, seed data, scaffold gaps; suggest splits/promotions and added ACs/FRs.
    - **Quality & Coherence Reviewer:** stress-test PRD draft + JSON for contradictions, vagueness, ordering, sync issues; list fixes.
+   - **Domain Expert:** validate domain accuracy — correct terminology, complete workflows, realistic edge cases, and ACs that reflect real-world usage in the problem space.
    - **Final Formatter & Archivist:** produce final PRD markdown + synced `.ralph/tasks.json`; apply archive rules if prior tasks exist.
 
    **Review loop:**
@@ -38,7 +39,7 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
 
    **Per-role document requirements:**
    - Each role must produce a brief role-specific document stored alongside the PRD in `.ralph/prds/`.
-   - **Filename pattern:** `NNNN-role-<order>-<name>.md` (e.g., `0001-role-1-clarification.md`, `0001-role-4-feasibility.md`). The order prefix preserves sequence and avoids collisions with the primary PRD file (`NNNN-prd-[feature-name].md`).
+   - **Filename pattern:** `NNNN-role-<order>-<name>.md` (e.g., `0001-role-1-clarification.md`, `0001-role-6-domain-expert.md`). The order prefix preserves sequence and avoids collisions with the primary PRD file (`NNNN-prd-[feature-name].md`).
    - **Required sections in each role doc:**
      1. **Inputs consumed** — which prior role docs and user inputs were read.
      2. **Decisions & changes** — what was decided or changed in the PRD/tasks.
