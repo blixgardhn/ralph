@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Lean AI loop
-# Usage: ./ralph.sh [--tool opencode|amp|claude] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [max_iterations]
 # Orchestrates short agent runs driven by prompt.md and tasks.json, archiving old runs when the PRD changes.
 
 set -euo pipefail
@@ -27,6 +27,14 @@ parse_args() {
         ;;
       --tool=*)
         TOOL="${1#*=}"
+        shift
+        ;;
+      --opencode-model)
+        OPENCODE_MODEL="$2"
+        shift 2
+        ;;
+      --opencode-model=*)
+        OPENCODE_MODEL="${1#*=}"
         shift
         ;;
       --target-repo)
