@@ -8,7 +8,7 @@ user-invocable: true
 
 > **Methodology:** This skill is the planning backbone of the **Ralph Wiggum AI-agent code generation methodology**. Every output must be auditable (decisions traced to rationale), reproducible (any agent instance can resume from artifacts alone), and junior-executable (no deep system or domain knowledge required beyond the task spec). Adherence to container-mandate, spec-gap logging, and tool-use discipline defined in `ralph-specs/AGENTS.md` is assumed throughout.
 
-Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json` for Ralph. Both outputs must describe the same tasks, acceptance criteria, and ordering.
+Create a clear, actionable PRD in markdown and a corresponding `.ralph/tasks.json` for Ralph. Tasks in the JSON exist to support and realize the requirements in the PRD; a single requirement may need multiple tasks to be fully implemented.
 
 ---
 
@@ -21,9 +21,9 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
    - **Problem & Context Analyst:** synthesize problem, personas, JTBD, goals, constraints, success metrics, non-goals.
    - **Scope & Story Engineer:** break into 6–10 small, committable, dependency-ordered tasks with concrete ACs/boilerplate.
    - **Feasibility & Constraints Advisor:** flag NFRs, tech debt, seed data, scaffold gaps; suggest splits/promotions and added ACs/FRs.
-   - **Quality & Coherence Reviewer:** stress-test PRD draft + JSON for contradictions, vagueness, ordering, sync issues; list fixes.
+   - **Quality & Coherence Reviewer:** stress-test PRD draft + JSON for contradictions, vagueness, ordering, and completeness of requirement coverage; list fixes.
    - **Domain Expert:** validate domain accuracy — correct terminology, complete workflows, realistic edge cases, and ACs that reflect real-world usage in the problem space.
-   - **Final Formatter & Archivist:** produce final PRD markdown + synced `.ralph/tasks.json`; apply archive rules if prior tasks exist.
+   - **Final Formatter & Archivist:** produce final PRD markdown + `.ralph/tasks.json`; apply archive rules if prior tasks exist.
 
    **Review loop:**
    - After the initial pass, each role reviews the PRD draft and task list. Each role may rewrite the task list as needed (reorder, add, remove, split, merge, or rewrite tasks) to improve clarity, feasibility, and junior executability.
@@ -51,7 +51,7 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
 2. Generate the PRD in markdown using clarified inputs and the role outputs.
 3. Generate the matching `.ralph/tasks.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow).
 4. After the first full pass, review the PRD task list and split any broad tasks into focused jobs that are deterministic, testable, individually committable, and small enough for a junior developer to pick up without needing deep system or domain knowledge.
-5. Save both outputs; ensure they stay in sync (titles, IDs, order, acceptance criteria).
+5. Save both outputs; ensure every task in `tasks.json` traces back to one or more functional requirements in the PRD and that all requirements are covered by at least one task.
 6. Keep tasks minimal and focused; split aggressively so each task fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one task.
 7. Ensure the PRD depth and task list size mirror the complexity of the application being specified; right-size scope so complexity is captured without over- or under-splitting.
 8. Before finalizing the PRD, take a high-level pass over all tasks to ensure they fit together coherently and reorder them based on dependencies and implementation flow; the order must make sense end-to-end.
@@ -64,9 +64,9 @@ Create a clear, actionable PRD in markdown and a synchronized `.ralph/tasks.json
 ### Mini-PRD Path (Trivial Scope)
 
 When the scope is truly tiny (e.g., a config tweak, a single-file rename, a one-endpoint addition):
-- Allow 3–4 tasks minimum; still require sync, boilerplate ACs, and the role loop (one pass is acceptable if no issues surface).
+- Allow 3–4 tasks minimum; still require boilerplate ACs and the role loop (one pass is acceptable if no issues surface).
 - Document the rationale for choosing the mini-PRD path in the PRD introduction.
-- All other rules (sync checklist, mandatory ACs, per-role docs) still apply.
+- All other rules (requirement coverage checklist, mandatory ACs, per-role docs) still apply.
 
 ### Methodology-Specific AC Constraints
 
@@ -208,23 +208,25 @@ Task format:
 
 ---
 
-## Step 4: Outputs and Sync
+## Step 4: Outputs and Traceability
 
 - **Markdown PRD:** `.ralph/prds/NNNN-prd-[feature-name].md` (next zero-padded number)
 - **Ralph JSON:** `.ralph/tasks.json` in repo root
 - **Role docs:** `.ralph/prds/NNNN-role-<order>-<name>.md` per role (see per-role document requirements above)
-- Keep titles, IDs, descriptions, acceptance criteria, subtasks, and order identical between the markdown tasks and JSON entries
+- Tasks exist to realize and support the PRD's functional requirements; a single requirement may need multiple tasks, and that is expected
+- Every task must trace back to at least one functional requirement; every functional requirement must be covered by at least one task
+- Task IDs, titles, and acceptance criteria in `tasks.json` are authoritative for implementation; the PRD provides the requirements context and rationale
 - When new requirements arrive before all existing `tasks` have `passes: true`, append the new tasks to both files and preserve all unfinished tasks and their current `passes` values; do not rewrite or drop unpassed tasks
 - If any `passes: false` tasks exist, do not archive the current `.ralph/tasks.json`; instead, append new tasks to it so unfinished work remains
 - If an existing `.ralph/tasks.json` belongs to a different feature and `.ralph/progress.md` has content, archive per runner convention before overwriting (only when all tasks have `passes: true`)
 
-### Sync / QA Checklist (must pass before finalizing)
+### Requirement Coverage / QA Checklist (must pass before finalizing)
 
 Run this checklist after producing both files:
 
-- [ ] Every task ID in PRD matches a task ID in tasks.json (and vice versa)
-- [ ] Titles, descriptions, ACs, and subtasks are identical between PRD markdown and JSON entries
-- [ ] Task order is identical in both files and reflects dependency/implementation flow
+- [ ] Every task in tasks.json traces back to at least one functional requirement in the PRD
+- [ ] Every functional requirement in the PRD is covered by at least one task in tasks.json
+- [ ] Task order reflects dependency and implementation flow
 - [ ] Every task has `Typecheck passes` AC
 - [ ] Every task with testable logic has `Tests pass` AC
 - [ ] Every UI task has `Verify in browser using dev-browser skill` AC
@@ -258,14 +260,14 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 ## Final Checklist (both files must pass)
 
 - [ ] Clarifying questions asked and answered (lettered options)
-- [ ] Tasks are small, ordered by dependency, and mapped 1:1 between markdown and JSON
+- [ ] Tasks are small, ordered by dependency, and every functional requirement is covered by at least one task
 - [ ] Every task has verifiable acceptance criteria with required boilerplate lines (typecheck, tests, browser, spec gaps, container as applicable)
 - [ ] No task mixes schema/data-layer with UI/presentation changes
 - [ ] Seed data/fixtures enumerated per task where ACs depend on them
 - [ ] Functional requirements are numbered; non-goals set boundaries
-- [ ] Files saved to `.ralph/prds/NNNN-prd-[feature].md` and `.ralph/tasks.json` with matching content
+- [ ] Files saved to `.ralph/prds/NNNN-prd-[feature].md` and `.ralph/tasks.json`
 - [ ] Per-role docs saved to `.ralph/prds/NNNN-role-<order>-<name>.md` with required sections
 - [ ] `branchName` includes PRD ID (`ralph/prd-<NNNN>-<slug>`)
-- [ ] Sync/QA checklist passed (see Step 4)
+- [ ] Requirement coverage / QA checklist passed (see Step 4)
 - [ ] Role sign-off checklist complete; change ledger present
 - [ ] Methodology rationale documented if mini-PRD path was chosen
