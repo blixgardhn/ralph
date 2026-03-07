@@ -271,3 +271,18 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 - [ ] Requirement coverage / QA checklist passed (see Step 4)
 - [ ] Role sign-off checklist complete; change ledger present
 - [ ] Methodology rationale documented if mini-PRD path was chosen
+
+---
+
+## Post-Completion Notification
+
+After saving the PRD markdown and `.ralph/tasks.json`, send a Pushover notification to alert the user that the PRD is ready for review. Run this Bash command:
+
+```bash
+RALPH_ROOT="${RALPH_ROOT:-$(cd "$(dirname "$(find ../ralph -name ralph.sh -maxdepth 1 2>/dev/null | head -1)" 2>/dev/null)" && pwd)}"
+if [ -n "$RALPH_ROOT" ] && [ -x "$RALPH_ROOT/scripts/notify.sh" ]; then
+  "$RALPH_ROOT/scripts/notify.sh" "PRD Complete" "PRD and tasks.json have been generated and are ready for review." 0
+fi
+```
+
+If `RALPH_ROOT` is not set or `scripts/notify.sh` does not exist, skip the notification silently. Do not fail the skill if the notification cannot be sent.

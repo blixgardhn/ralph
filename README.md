@@ -27,6 +27,23 @@ Ralph reads runner files only from `RALPH_ROOT` and writes all iteration artifac
 
 Project dependencies, linting, testing, builds, and database seeding must be executed via container entrypoints (e.g., `docker compose run` / `podman compose run`). Do not install project toolchains on the host.
 
+### Pushover Notifications (Optional)
+
+Ralph can send push notifications via [Pushover](https://pushover.net) when the loop terminates (all tasks complete, agent stop, max iterations, or errors) and when the PRD skill finishes generating specs.
+
+Set these environment variables to enable notifications:
+
+```bash
+export PUSHOVER_TOKEN="your-pushover-app-token"
+export PUSHOVER_USER_KEY="your-pushover-user-key"
+```
+
+Optional variables:
+- `PUSHOVER_DEVICE` - target a specific device (default: all)
+- `PUSHOVER_SOUND` - notification sound name (default: pushover)
+
+If the variables are not set, notifications are silently skipped. The script `scripts/notify.sh` can also be called standalone for custom notifications.
+
 ## Setup
 
 ### Option 1: Copy to your project
@@ -151,6 +168,7 @@ Ralph will:
 | `.ralph/progress.md` | Append-only learnings for future iterations |
 | `tasks.json.example` | Example PRD format for reference |
 | `.ralph/suggested_improvements.md` | Suggestions to improve the Ralph runner/prompts/process (lives in the target repo; do not write inside the runner) |
+| `scripts/notify.sh` | Pushover notification helper (requires `PUSHOVER_TOKEN` and `PUSHOVER_USER_KEY` env vars) |
 | `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
 | `skills/ralph_prd/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
 

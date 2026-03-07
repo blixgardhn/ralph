@@ -27,7 +27,7 @@ configure_prd_paths() {
 require_prd_file() {
   if [ ! -f "$PRD_FILE" ]; then
     echo "Missing tasks file; expected at $PRD_FILE" >&2
-    exit 1
+    notify_and_exit 1 "Ralph: Missing PRD" "Missing tasks file; expected at $PRD_FILE" 0
   fi
 }
 
@@ -166,12 +166,12 @@ validate_prd() {
   story_count=$(jq '(.tasks // []) | length' "$PRD_FILE" 2>/dev/null || echo 0)
   if [ "$story_count" -eq 0 ]; then
     echo "PRD has no tasks; add tasks before running Ralph." >&2
-    exit 1
+    notify_and_exit 1 "Ralph: PRD Error" "PRD has no tasks; add tasks before running Ralph." 0
   fi
 
   missing_fields=$(jq -r '(.tasks // [])[] | select((.id? | type != "string") or (.title? | type != "string") or (.passes? | type != "boolean")) | .id // "<no id>"' "$PRD_FILE" 2>/dev/null || true)
   if [ -n "$missing_fields" ]; then
     echo "PRD has tasks missing required fields (id/title/passes). Offending IDs: $missing_fields" >&2
-    exit 1
+    notify_and_exit 1 "Ralph: PRD Error" "PRD tasks missing required fields (id/title/passes).\nOffending IDs: $missing_fields" 0
   fi
 }

@@ -62,10 +62,78 @@ source "$RALPH_ROOT/prd_utils.sh"
 # shellcheck source=./timer_utils.sh
 source "$RALPH_ROOT/timer_utils.sh"
 
+# ── Pushover notifications ──────────────────────────────────────────
+# Sends a notification via scripts/notify.sh if PUSHOVER_TOKEN and
+# PUSHOVER_USER_KEY are set. Silently skipped otherwise.
+#
+# Usage: send_notification <title> <message> [priority]
+send_notification() {
+  local title="$1"
+  local message="$2"
+  local priority="${3:-0}"
+  local notify_script="$RALPH_ROOT/scripts/notify.sh"
+
+  if [ ! -x "$notify_script" ]; then
+    return 0
+  fi
+
+  "$notify_script" "$title" "$message" "$priority" || true
+}
+
+# Collect context for rich notification messages.
+_notify_context() {
+  local project branch total_tasks completed remaining
+  project=""
+  branch=""
+  total_tasks="${TOTAL_TASKS:-?}"
+  completed="?"
+  remaining="?"
+
+  if command -v jq >/dev/null 2>&1 && [ -n "${PRD_FILE:-}" ] && [ -f "${PRD_FILE:-}" ]; then
+    project=$(jq -r '.project // empty' "$PRD_FILE" 2>/dev/null || true)
+    branch=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || true)
+    remaining=$(jq '(.tasks // []) | map(select(.passes != true)) | length' "$PRD_FILE" 2>/dev/null || echo "?")
+    if [ "$total_tasks" != "?" ] && [ "$remaining" != "?" ]; then
+      completed=$((total_tasks - remaining))
+    fi
+  fi
+
+  local ctx=""
+  [ -n "$project" ] && ctx="${ctx}<b>Project:</b> ${project}\n"
+  [ -n "$branch" ] && ctx="${ctx}<b>Branch:</b> ${branch}\n"
+  ctx="${ctx}<b>Tool:</b> ${TOOL:-unknown}\n"
+  ctx="${ctx}<b>Tasks:</b> ${completed}/${total_tasks} done"
+  [ "$remaining" != "?" ] && [ "$remaining" != "0" ] && ctx="${ctx} (${remaining} remaining)"
+  ctx="${ctx}\n"
+  if [ -n "${LOOP_START_SECS:-}" ]; then
+    local now elapsed_str
+    now=$(date +%s)
+    elapsed_str=$(format_duration $((now - LOOP_START_SECS)) 2>/dev/null || echo "?")
+    ctx="${ctx}<b>Elapsed:</b> ${elapsed_str}\n"
+  fi
+  printf '%b' "$ctx"
+}
+
+# Notify and exit. Replaces bare `exit` at termination points.
+# Usage: notify_and_exit <exit_code> <reason_title> <reason_detail> [priority]
+notify_and_exit() {
+  local code="$1"
+  local reason_title="$2"
+  local reason_detail="$3"
+  local priority="${4:-0}"
+
+  local context
+  context=$(_notify_context 2>/dev/null || true)
+  local message="${reason_detail}\n\n${context}"
+
+  send_notification "$reason_title" "$(printf '%b' "$message")" "$priority"
+  exit "$code"
+}
+
 validate_tool() {
   if [[ "$TOOL" != "amp" && "$TOOL" != "claude" && "$TOOL" != "opencode" ]]; then
     echo "Error: Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'opencode'."
-    exit 1
+    notify_and_exit 1 "Ralph: Invalid Tool" "Invalid tool '$TOOL'. Must be 'amp', 'claude', or 'opencode'." 0
   fi
 }
 
@@ -88,19 +156,19 @@ set_paths() {
 
   if [ -z "$target_repo_input" ]; then
     echo "TARGET_REPO is empty; specify --target-repo or set TARGET_REPO." >&2
-    exit 1
+    notify_and_exit 1 "Ralph: Config Error" "TARGET_REPO is empty; specify --target-repo or set TARGET_REPO." 0
   fi
 
   if ! TARGET_REPO="$(cd "$target_repo_input" 2>/dev/null && pwd)"; then
     echo "TARGET_REPO path is invalid: $target_repo_input" >&2
-    exit 1
+    notify_and_exit 1 "Ralph: Config Error" "TARGET_REPO path is invalid: $target_repo_input" 0
   fi
 
   case "$TARGET_REPO" in
     "$RALPH_ROOT"|"$RALPH_ROOT"/*)
       echo "TARGET_REPO must not be the Ralph runner directory; point to a project repo containing .ralph." >&2
       echo "Resolved target: $TARGET_REPO" >&2
-      exit 1
+      notify_and_exit 1 "Ralph: Config Error" "TARGET_REPO must not be the Ralph runner directory.\nResolved target: $TARGET_REPO" 0
       ;;
   esac
 
@@ -218,24 +286,24 @@ log_instruction_fingerprints() {
 require_prompt() {
   if [ ! -f "$PROMPT_FILE" ]; then
     echo "Missing prompt file at $PROMPT_FILE"
-    exit 1
+    notify_and_exit 1 "Ralph: Missing Prompt" "Missing prompt file at $PROMPT_FILE" 0
   fi
 }
 
 enforce_feature_branch() {
   if ! command -v git >/dev/null 2>&1; then
     echo "[Ralph] Branch enforcement failed: git not installed." >&2
-    exit 1
+    notify_and_exit 1 "Ralph: Setup Error" "Branch enforcement failed: git not installed." 0
   fi
 
   if [ ! -d "$TARGET_REPO_ROOT/.git" ]; then
     echo "[Ralph] Branch enforcement failed: $TARGET_REPO_ROOT is not a git repo." >&2
-    exit 1
+    notify_and_exit 1 "Ralph: Setup Error" "Branch enforcement failed: $TARGET_REPO_ROOT is not a git repo." 0
   fi
 
   if ! command -v jq >/dev/null 2>&1; then
     echo "[Ralph] Branch enforcement failed: jq not installed to read branchName from PRD." >&2
-    exit 1
+    notify_and_exit 1 "Ralph: Setup Error" "Branch enforcement failed: jq not installed." 0
   fi
 
   local prd_branch
@@ -243,12 +311,12 @@ enforce_feature_branch() {
 
   if [ -z "$prd_branch" ]; then
     echo "[Ralph] PRD missing branchName; set a feature branch (e.g., ralph/<story-id>)." >&2
-    exit 1
+    notify_and_exit 1 "Ralph: PRD Error" "PRD missing branchName; set a feature branch." 0
   fi
 
   if [ "$prd_branch" = "main" ] || [ "$prd_branch" = "master" ]; then
     echo "[Ralph] PRD branchName cannot be main/master; use a dedicated feature branch." >&2
-    exit 1
+    notify_and_exit 1 "Ralph: PRD Error" "PRD branchName cannot be main/master; use a dedicated feature branch." 0
   fi
 
   local current_branch
@@ -270,7 +338,7 @@ enforce_feature_branch() {
 
   echo "[Ralph] Could not switch to or create branch '$prd_branch'." >&2
   echo "Try manually: git -C \"$TARGET_REPO_ROOT\" switch '$prd_branch' || git -C \"$TARGET_REPO_ROOT\" switch -c '$prd_branch'" >&2
-  exit 1
+  notify_and_exit 1 "Ralph: Branch Error" "Could not switch to or create branch '$prd_branch'." 0
 }
 
 warn_if_target_instructions_present() {
@@ -400,7 +468,7 @@ run_iteration() {
 
   if [ -z "$SELECTED_TASK_ID" ]; then
     echo "[Ralph] No unblocked tasks available; stopping." >&2
-    exit 0
+    notify_and_exit 0 "Ralph: No Unblocked Tasks" "No unblocked tasks available; all tasks may be done or blocked.\nStopping at iteration $iteration." 0
   fi
 
   local OUTPUT
@@ -446,7 +514,7 @@ run_iteration() {
     elapsed=$((iter_end - iter_start))
     loop_elapsed=$((iter_end - LOOP_START_SECS))
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
-    exit 0
+    notify_and_exit 0 "Ralph: All Tasks Complete" "All tasks completed at iteration $iteration of $MAX_ITERATIONS.\n<b>Iteration time:</b> $(format_duration "$elapsed")\n<b>Total time:</b> $(format_duration "$loop_elapsed")" 0
   fi
 
   if echo "$OUTPUT" | grep -q "<promise>STOP</promise>"; then
@@ -458,7 +526,7 @@ run_iteration() {
     elapsed=$((iter_end - iter_start))
     loop_elapsed=$((iter_end - LOOP_START_SECS))
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
-    exit 0
+    notify_and_exit 0 "Ralph: Stopped" "Agent requested stop at iteration $iteration of $MAX_ITERATIONS.\n<b>Iteration time:</b> $(format_duration "$elapsed")\n<b>Total time:</b> $(format_duration "$loop_elapsed")" 1
   fi
 
   record_suggestions "$iteration" "continued" "$OUTPUT"
@@ -484,7 +552,7 @@ run_iterations() {
   done
 
   echo "Reached max iterations ($MAX_ITERATIONS) without completion."
-  exit 1
+  notify_and_exit 1 "Ralph: Max Iterations" "Reached max iterations ($MAX_ITERATIONS) without completing all tasks." 1
 }
 
 main() {
