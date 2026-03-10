@@ -220,6 +220,15 @@ Too big (split these):
 - "Add authentication"
 - "Refactor the API"
 
+### Codebase Pattern Analysis (keyFiles & implementationNotes)
+
+During PRD creation, the **Codebase Pattern Analyst** role (Role 5) reads the target codebase and populates two optional fields on each task in `tasks.json`:
+
+- **`keyFiles`** — array of file paths relevant to the task (files to read, create, or modify). New files include a `(create new)` suffix. These are hints, not guarantees; paths may shift between PRD creation and execution.
+- **`implementationNotes`** — concise guidance on how to implement: which patterns to follow, reference implementations, naming conventions, and test file locations.
+
+These fields let iteration agents skip the file discovery phase and start implementing immediately. When present, the agent reads `keyFiles` first and follows `implementationNotes` before doing any broad codebase scans.
+
 ### AGENTS.md Updates Are Critical
 
 After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because AI coding tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.

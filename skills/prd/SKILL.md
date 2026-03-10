@@ -21,7 +21,8 @@ Create a clear, actionable PRD in markdown and a corresponding `.ralph/tasks.jso
    - **Problem & Context Analyst:** synthesize problem, personas, JTBD, goals, constraints, success metrics, non-goals.
    - **Scope & Story Engineer:** break into 6–10 small, committable, dependency-ordered tasks with concrete ACs/boilerplate.
    - **Feasibility & Constraints Advisor:** flag NFRs, tech debt, seed data, scaffold gaps; suggest splits/promotions and added ACs/FRs.
-   - **Quality & Coherence Reviewer:** stress-test PRD draft + JSON for contradictions, vagueness, ordering, and completeness of requirement coverage; list fixes.
+   - **Codebase Pattern Analyst:** read the target codebase to identify conventions, patterns, and relevant files; populate `keyFiles` and `implementationNotes` for every task so iteration agents skip file discovery and start implementing immediately.
+   - **Quality & Coherence Reviewer:** stress-test PRD draft + JSON for contradictions, vagueness, ordering, and completeness of requirement coverage; list fixes. Verify every task has `keyFiles` and `implementationNotes` populated.
    - **Domain Expert:** validate domain accuracy — correct terminology, complete workflows, realistic edge cases, and ACs that reflect real-world usage in the problem space.
    - **Final Formatter & Archivist:** produce final PRD markdown + `.ralph/tasks.json`; apply archive rules if prior tasks exist.
 
@@ -39,7 +40,7 @@ Create a clear, actionable PRD in markdown and a corresponding `.ralph/tasks.jso
 
    **Per-role document requirements:**
    - Each role must produce a brief role-specific document stored alongside the PRD in `.ralph/prds/`.
-   - **Filename pattern:** `NNNN-role-<order>-<name>.md` (e.g., `0001-role-1-clarification.md`, `0001-role-6-domain-expert.md`). The order prefix preserves sequence and avoids collisions with the primary PRD file (`NNNN-prd-[feature-name].md`).
+    - **Filename pattern:** `NNNN-role-<order>-<name>.md` (e.g., `0001-role-1-clarification.md`, `0001-role-7-domain-expert.md`). The order prefix preserves sequence and avoids collisions with the primary PRD file (`NNNN-prd-[feature-name].md`).
    - **Required sections in each role doc:**
      1. **Inputs consumed** — which prior role docs and user inputs were read.
      2. **Decisions & changes** — what was decided or changed in the PRD/tasks.
@@ -186,6 +187,8 @@ Task format:
       "description": "As a [user], I want [feature] so that [benefit]",
       "acceptanceCriteria": ["Criterion 1", "Criterion 2", "Typecheck passes"],
       "subtasks": ["Subtask 1", "Subtask 2"],
+      "keyFiles": ["src/routes/example.ts", "src/services/example.ts", "tests/example.test.ts (create new)"],
+      "implementationNotes": "Follow the pattern in src/routes/users.ts for route + controller + test structure. Use the existing BaseService class for the service layer.",
       "passes": false,
       "notes": ""
     }
@@ -205,6 +208,8 @@ Task format:
 - `branchName` = `ralph/prd-<NNNN>-<feature-name-kebab-case>` (must include PRD ID for provenance).
 - Include seed data requirements when acceptance tests need preloaded data.
 - `subtasks`: every story lists 3–6 actionable subtasks scoped to that story only; if you cannot do that without crossing boundaries, split again.
+- `keyFiles` (optional): array of file paths relevant to the task — files to read, create, or modify. Populated by the Codebase Pattern Analyst (Role 5). Paths that don't exist yet should include a `(create new)` suffix. These are hints, not guarantees; iteration agents should fall back to searching by filename stem if a listed path doesn't exist.
+- `implementationNotes` (optional): concise guidance on how to implement — which patterns to follow, reference implementations in the codebase, naming conventions, test file locations. Populated by the Codebase Pattern Analyst (Role 5).
 
 ---
 
@@ -212,7 +217,7 @@ Task format:
 
 - **Markdown PRD:** `.ralph/prds/NNNN-prd-[feature-name].md` (next zero-padded number)
 - **Ralph JSON:** `.ralph/tasks.json` in repo root
-- **Role docs:** `.ralph/prds/NNNN-role-<order>-<name>.md` per role (see per-role document requirements above)
+- **Role docs:** `.ralph/prds/NNNN-role-<order>-<name>.md` per role (1–8; see per-role document requirements above)
 - Tasks exist to realize and support the PRD's functional requirements; a single requirement may need multiple tasks, and that is expected
 - Every task must trace back to at least one functional requirement; every functional requirement must be covered by at least one task
 - Task IDs, titles, and acceptance criteria in `tasks.json` are authoritative for implementation; the PRD provides the requirements context and rationale
@@ -232,6 +237,9 @@ Run this checklist after producing both files:
 - [ ] Every UI task has `Verify in browser using dev-browser skill` AC
 - [ ] Seed data/fixtures are enumerated per task where ACs depend on them
 - [ ] No task mixes schema/data-layer changes with UI/presentation changes
+- [ ] Every task has `keyFiles` populated (may be empty array for greenfield scaffold tasks only)
+- [ ] Every task has `implementationNotes` populated (may be brief for trivial tasks)
+- [ ] `keyFiles` paths are plausible given the codebase structure
 - [ ] `branchName` includes PRD ID: `ralph/prd-<id>-<feature-slug>`
 - [ ] Role sign-off checklist is complete (all roles have no remaining objections)
 - [ ] Change ledger is present and documents accepted/rejected suggestions with rationale
@@ -263,6 +271,7 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 - [ ] Tasks are small, ordered by dependency, and every functional requirement is covered by at least one task
 - [ ] Every task has verifiable acceptance criteria with required boilerplate lines (typecheck, tests, browser, spec gaps, container as applicable)
 - [ ] No task mixes schema/data-layer with UI/presentation changes
+- [ ] Every task has `keyFiles` and `implementationNotes` populated (by Codebase Pattern Analyst)
 - [ ] Seed data/fixtures enumerated per task where ACs depend on them
 - [ ] Functional requirements are numbered; non-goals set boundaries
 - [ ] Files saved to `.ralph/prds/NNNN-prd-[feature].md` and `.ralph/tasks.json`

@@ -93,7 +93,48 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 
 ---
 
-### Role 5: Quality & Coherence Reviewer (Critic / QA Agent)
+### Role 5: Codebase Pattern Analyst (Implementation Accelerator)
+
+| Attribute | Detail |
+| --- | --- |
+| **Personality / Tone** | Methodical archaeologist, pattern-oriented, pragmatic |
+| **Goal** | Analyze the existing codebase to identify conventions, patterns, directory structure, and relevant files for each task. Embed this knowledge directly into task fields (`keyFiles`, `implementationNotes`) so iteration agents skip the discovery phase and start implementing immediately |
+| **When** | After Feasibility review (Role 4) — the task list is stable enough to analyze against the codebase. Before QA (Role 6) so findings get reviewed |
+| **Trigger** | "You are a codebase archaeologist. Read the target repository's directory structure, key source files, test files, and configuration. For each task in the current task list, identify the specific files to read/create/modify and the implementation patterns to follow. Populate `keyFiles` and `implementationNotes` for every task." |
+
+**Required inputs:** All prior role docs (1–4), current task list draft, access to the target codebase.
+**Required outputs per task:**
+- `keyFiles` array — files to read, create, or modify for this task. Paths that don't exist yet should include a `(create new)` suffix.
+- `implementationNotes` — concise guidance on *how* to implement: which patterns to follow, reference implementations in the codebase, naming conventions, test file locations.
+
+**Required outputs (project-wide, in the role doc):**
+- **Codebase patterns summary** — project-wide conventions discovered:
+  - Directory structure and module organization
+  - Naming conventions (files, functions, variables, tests)
+  - Framework/library patterns (ORM queries, API route handlers, component structure)
+  - Test patterns (test file location, describe/it conventions, fixtures, mocking approach)
+  - Build/run/test commands and container entrypoints
+- **Reference implementations** — for each task, identify the closest existing implementation in the codebase that the new code should follow (e.g., "T-003 should follow the pattern in `src/routes/users.ts` for route + controller + test structure").
+
+**Codebase analysis checklist (must address each):**
+- [ ] Directory structure mapped — top-level layout, where source/test/config files live
+- [ ] Naming conventions identified — file names, function names, class names, test file naming
+- [ ] Framework patterns documented — how existing features are structured (route → controller → service → model, component → hook → store, etc.)
+- [ ] Test patterns documented — test runner, file location convention, describe/it style, fixture/mock approach
+- [ ] Build/run commands identified — how to build, test, lint, and run the project (container commands preferred)
+- [ ] Every task has `keyFiles` populated — existing files to read/modify, new files to create
+- [ ] Every task has `implementationNotes` populated — pattern to follow, reference implementation, naming guidance
+- [ ] Greenfield tasks handled — if files don't exist yet, note "(create new)" and reference the stack's conventional structure
+
+**Greenfield constraint:** When the codebase doesn't exist yet (scaffold task), produce a lighter output: document the chosen stack's conventional patterns and directory structure. Populate `keyFiles` with expected paths marked "(create new)" and `implementationNotes` with framework-standard patterns.
+
+**Stale path constraint:** Paths may change between PRD creation and execution. `keyFiles` are hints, not guarantees. The iteration agent should fall back to searching by filename stem if a listed path doesn't exist.
+
+**Role doc sections:** Inputs consumed, Codebase patterns summary, Per-task keyFiles and implementationNotes, Decisions & changes, Task rewrites (if codebase analysis reveals splits or reorders), Risks & open questions, Rationale.
+
+---
+
+### Role 6: Quality & Coherence Reviewer (Critic / QA Agent)
 
 | Attribute | Detail |
 | --- | --- |
@@ -102,7 +143,7 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 | **When** | Final internal loop (can iterate 1–2x) — biggest quality jump |
 | **Trigger** | "Act as senior PM + tech lead reviewer. Read entire PRD draft + proposed JSON. List ALL issues numbered. Then propose fixes." |
 
-**Required inputs:** All prior role docs (1–4), current PRD draft, current tasks.json draft.
+**Required inputs:** All prior role docs (1–5), current PRD draft, current tasks.json draft.
 **Required outputs:**
 - Numbered list of all issues found.
 - Proposed fixes per issue.
@@ -119,12 +160,15 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 - [ ] Seed data/fixtures enumerated per task where ACs depend on them
 - [ ] `branchName` includes PRD ID
 - [ ] Spec gaps are explicitly flagged (not silently ignored)
+- [ ] Every task has `keyFiles` populated (may be empty array for greenfield scaffold tasks only)
+- [ ] Every task has `implementationNotes` populated (may be brief for trivial tasks)
+- [ ] `keyFiles` paths are plausible given the codebase structure
 
 **Role doc sections:** Inputs consumed, Decisions & changes, Task rewrites (reorders, fixes, splits), Risks & open questions, Rationale.
 
 ---
 
-### Role 6: Domain Expert (Subject-Matter Reviewer)
+### Role 7: Domain Expert (Subject-Matter Reviewer)
 
 | Attribute | Detail |
 | --- | --- |
@@ -133,7 +177,7 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 | **When** | After QA review — final substantive review before formatting. Ensures the solution is not just internally consistent but *domain-correct* |
 | **Trigger** | "You are a domain expert in the problem space this application addresses. Review the PRD, tasks, and ACs. Flag any domain inaccuracies, missing workflows, incorrect terminology, unrealistic assumptions, or gaps that would cause the product to fail real-world usage." |
 
-**Required inputs:** All prior role docs (1–5), current PRD draft, current tasks.json draft, any domain context from the user request.
+**Required inputs:** All prior role docs (1–6), current PRD draft, current tasks.json draft, any domain context from the user request.
 **Required outputs:**
 - Domain accuracy assessment (terminology, workflows, data models).
 - Missing domain workflows or edge cases that real users would encounter.
@@ -154,7 +198,7 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 
 ---
 
-### Role 7: Final Formatter, Archivist & Orchestrator
+### Role 8: Final Formatter, Archivist & Orchestrator
 
 | Attribute | Detail |
 | --- | --- |
@@ -163,7 +207,7 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 | **When** | Last step — only after Domain Expert and Reviewer approve or after fixes are applied |
 | **Trigger** | "Format final PRD markdown exactly per template. Then generate matching tasks.json. Apply archive rules if existing unfinished tasks.json exists. Resolve any remaining inter-role conflicts." |
 
-**Required inputs:** All prior role docs (1–6), final PRD draft, final tasks.json draft.
+**Required inputs:** All prior role docs (1–7), final PRD draft, final tasks.json draft.
 **Required outputs:**
 - Final PRD markdown and tasks.json (synced).
 - Archive actions taken (if any).
@@ -180,6 +224,7 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
   - [x] Problem & Context Analyst — no objections
   - [x] Scope & Story Engineer — no objections
   - [x] Feasibility & Constraints Advisor — no objections
+  - [x] Codebase Pattern Analyst — no objections
   - [x] Quality & Coherence Reviewer — no objections
   - [x] Domain Expert — no objections
   - [x] Final Formatter & Orchestrator — sign-off complete
@@ -208,9 +253,9 @@ Not every PRD requires the same depth of analysis. Right-size the role processin
 
 | Scope | Role depth | Review iterations |
 | --- | --- | --- |
-| **Trivial** (config tweak, rename, single-endpoint) | Mini-PRD path: lighter passes, 3–4 tasks. One review iteration is acceptable if no issues surface. | 1 |
+| **Trivial** (config tweak, rename, single-endpoint) | Mini-PRD path: lighter passes, 3–4 tasks. One review iteration is acceptable if no issues surface. Codebase Pattern Analyst may produce minimal output if the change is isolated. | 1 |
 | **Standard** (typical feature, 6–10 tasks) | Full role flow. Two review iterations if needed. | 1–2 |
-| **Complex** (multi-surface: DB + API + UI + docs, >10 tasks) | Deep passes per role. Feasibility, QA, and Domain Expert roles should be thorough. Two review iterations expected. | 2 |
+| **Complex** (multi-surface: DB + API + UI + docs, >10 tasks) | Deep passes per role. Feasibility, Codebase Pattern Analyst, QA, and Domain Expert roles should be thorough. Two review iterations expected. | 2 |
 
 When using the mini-PRD path, document the rationale in the PRD introduction. All other rules (sync checklist, mandatory ACs, per-role docs, handoff contract) still apply regardless of depth.
 

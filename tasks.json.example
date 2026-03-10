@@ -15,6 +15,12 @@
         "No priority field is stored in PRD or tasks",
         "Typecheck passes"
       ],
+      "keyFiles": [
+        "src/task-selector.ts",
+        "src/models/task.ts",
+        "tests/task-selector.test.ts (create new)"
+      ],
+      "implementationNotes": "Follow the pattern in src/task-runner.ts for reading tasks.json. Use topological sort on dependsOn fields to determine order.",
       "passes": false,
       "notes": ""
     }
