@@ -8,6 +8,8 @@ user-invocable: true
 
 > **Methodology:** This skill is the planning backbone of the **Ralph Wiggum AI-agent code generation methodology**. Every output must be auditable (decisions traced to rationale), reproducible (any agent instance can resume from artifacts alone), and junior-executable (no deep system or domain knowledge required beyond the task spec). Adherence to container-mandate, spec-gap logging, and tool-use discipline defined in `ralph-specs/AGENTS.md` is assumed throughout.
 
+> **PLANNING ONLY — DO NOT IMPLEMENT.** This skill produces specs (PRD markdown + `tasks.json`). Implementation happens later in separate Ralph iterations, each run by a fresh agent instance with clean context. Starting to code during PRD creation breaks the methodology: it conflates planning with execution, pollutes the planning context, and produces work that cannot be reviewed before implementation begins. If the user asks you to "also implement" or "start coding," decline and explain that implementation is a separate phase.
+
 Create a clear, actionable PRD in markdown and a corresponding `.ralph/tasks.json` for Ralph. Tasks in the JSON exist to support and realize the requirements in the PRD; a single requirement may need multiple tasks to be fully implemented.
 
 ---
@@ -83,7 +85,7 @@ Hard constraints on task composition:
 - **Seed data/fixtures must be enumerated per task** when ACs depend on preloaded data; do not leave seed data as an afterthought.
 - **Documentation task required** when user-facing behavior changes (e.g., new CLI flags, API endpoints, UI flows).
 
-**Important:** Do NOT implement the feature. Deliver specs only.
+**Important:** Do NOT implement the feature. Deliver specs only. No code changes, no file creation beyond the PRD and tasks.json artifacts, no "getting started" on the first task. Implementation is handled by separate Ralph iteration agents after the PRD is reviewed. This separation is fundamental to the methodology — planning and implementation are distinct phases run by different agent instances.
 
 ---
 
@@ -267,6 +269,7 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 
 ## Final Checklist (both files must pass)
 
+- [ ] **No implementation was performed** — only PRD markdown, tasks.json, and role docs were produced; no feature code was written or modified
 - [ ] Clarifying questions asked and answered (lettered options)
 - [ ] Tasks are small, ordered by dependency, and every functional requirement is covered by at least one task
 - [ ] Every task has verifiable acceptance criteria with required boilerplate lines (typecheck, tests, browser, spec gaps, container as applicable)
@@ -295,3 +298,5 @@ fi
 ```
 
 If `RALPH_ROOT` is not set or `scripts/notify.sh` does not exist, skip the notification silently. Do not fail the skill if the notification cannot be sent.
+
+**Your job is done.** Do not proceed to implementation. The PRD and tasks.json are now ready for the user to review. Implementation will happen in separate Ralph iterations, each run by a fresh agent instance. Tell the user the PRD is ready and that they can start the implementation loop with `ralph.sh`.
