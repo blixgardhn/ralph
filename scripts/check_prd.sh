@@ -109,4 +109,23 @@ if [[ -n "$unknown_dep_ids" ]]; then
   exit 1
 fi
 
+# Check for forward dependencies: if task X dependsOn Y, Y must appear before X in the array
+forward_deps=$(jq -r '
+  (.tasks // []) as $tasks
+  | ($tasks | to_entries | map({(.value.id): .key}) | add // {}) as $idx_map
+  | $tasks[]
+  | {id: .id, deps: (.dependsOn // [])}
+  | select(.deps | length > 0)
+  | . as $task
+  | ($idx_map[$task.id] // 0) as $my_idx
+  | {id: $task.id, forward: ([$task.deps[] | select(($idx_map[.] // -1) >= $my_idx)])}
+  | select(.forward | length > 0)
+  | "\(.id) depends on later task(s): \(.forward | join(", "))"' "$PRD_FILE")
+
+if [[ -n "$forward_deps" ]]; then
+  echo "[check_prd] Forward dependencies detected (task depends on a task that appears later in the array):" >&2
+  echo "$forward_deps" >&2
+  exit 1
+fi
+
 echo "[check_prd] OK: $PRD_FILE"

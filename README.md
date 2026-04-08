@@ -143,20 +143,24 @@ If you have an older markdown PRD, convert it to `.ralph/tasks.json` using the r
 
 # Using Claude Code
 ./scripts/ralph/ralph.sh --tool claude [max_iterations]
+
+# Host mode (skip containers, use host-installed tools)
+./scripts/ralph/ralph.sh --host-mode [max_iterations]
 ```
 
-Default is 30 iterations. Use `--tool amp` or `--tool claude` to override the default OpenCode tool.
+Default is 30 iterations. Use `--tool amp` or `--tool claude` to override the default OpenCode tool. Use `--host-mode` when tools are installed locally and you want to skip container overhead.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
-2. Pick the next task where `passes: false` based on dependency/implementation flow (use `dependsOn` sparingly so tasks stay parallelizable)
-3. Implement that single task
-4. Run quality checks inside containers (typecheck, tests; no host toolchains)
-5. Commit if checks pass
-6. Update `.ralph/tasks.json` to mark the task as `passes: true`
-7. Append learnings to `.ralph/progress.md`
-8. Capture Ralph-runner improvement ideas in the target repo’s `.ralph/suggested_improvements.md` (not in the runner checkout)
-9. Repeat until all tasks pass or max iterations reached
+2. Build the instruction prompt once (instructions + language-specific rules)
+3. Pick the next task where `passes: false` based on dependency/implementation flow
+4. Inject the selected task JSON and recent progress into the prompt
+5. Implement that single task
+6. Run quality checks (in containers by default, or on host with `--host-mode`)
+7. Commit if checks pass
+8. Update `.ralph/tasks.json` to mark the task as `passes: true`
+9. Append learnings to `.ralph/progress.md`
+10. Repeat until all tasks pass or max iterations reached
 
 ## Key Files
 
@@ -178,22 +182,21 @@ Ralph will:
 graph LR
   README[README.md]
   RALPH_SH[ralph.sh]
-  AGENTS[ralph-specs/AGENTS.md]
-  PROMPT[ralph-specs/prompt.md]
+  AGENTS[ralph-specs/AGENTS.md<br/>thin pointer]
+  PROMPT[ralph-specs/prompt.md<br/>primary directive]
   RULES_MD[ralph-specs/code_generation_rules/RULES.md]
   RULES_DOTNET[ralph-specs/code_generation_rules/RULES-dotnet.md]
   RULES_PY[ralph-specs/code_generation_rules/RULES-python.md]
+  ROLES[ralph-specs/ROLES.md]
 
   README --> RALPH_SH
-  RALPH_SH --> PROMPT
-  RALPH_SH --> AGENTS
-  RALPH_SH --> RULES_MD
-  RALPH_SH --> RULES_DOTNET
-  RALPH_SH --> RULES_PY
-  AGENTS --> RULES_MD
-  AGENTS --> RULES_DOTNET
-  AGENTS --> RULES_PY
-  PROMPT --> AGENTS
+  RALPH_SH -->|builds static prompt| PROMPT
+  RALPH_SH -->|includes| AGENTS
+  RALPH_SH -->|detects language & includes| RULES_MD
+  RALPH_SH -.->|if .NET detected| RULES_DOTNET
+  RALPH_SH -.->|if Python detected| RULES_PY
+  AGENTS -->|points to| PROMPT
+  PROMPT -.->|referenced during PRD| ROLES
 ```
 
 ## Critical Concepts

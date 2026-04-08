@@ -1,12 +1,13 @@
 #!/bin/bash
 # Ralph Wiggum - Lean AI loop
-# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [--host-mode] [max_iterations]
 # Orchestrates short agent runs driven by prompt.md and tasks.json, archiving old runs when the PRD changes.
 
 set -euo pipefail
 
 TOOL="opencode"
 MAX_ITERATIONS=30
+HOST_MODE=false
 OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 export RALPH_ROOT
@@ -15,6 +16,7 @@ export TARGET_REPO_ROOT
 RUNNER_AGENTS_FILE="$RALPH_ROOT/ralph-specs/AGENTS.md"
 RESOLVED_AGENTS_FILE=""
 RESOLVED_PROMPT_FILE=""
+STATIC_PROMPT="" # built once in main, reused every iteration
 
 TARGET_REPO_ARG=""
 
@@ -47,6 +49,10 @@ parse_args() {
         TARGET_REPO_ARG="${1#*=}"
         shift
         ;;
+      --host-mode)
+        HOST_MODE=true
+        shift
+        ;;
       *)
         if [[ "$1" =~ ^[0-9]+$ ]]; then
           MAX_ITERATIONS="$1"
@@ -63,10 +69,6 @@ source "$RALPH_ROOT/prd_utils.sh"
 source "$RALPH_ROOT/timer_utils.sh"
 
 # ── Pushover notifications ──────────────────────────────────────────
-# Sends a notification via scripts/notify.sh if PUSHOVER_TOKEN and
-# PUSHOVER_USER_KEY are set. Silently skipped otherwise.
-#
-# Usage: send_notification <title> <message> [priority]
 send_notification() {
   local title="$1"
   local message="$2"
@@ -80,7 +82,6 @@ send_notification() {
   "$notify_script" "$title" "$message" "$priority" || true
 }
 
-# Collect context for rich notification messages.
 _notify_context() {
   local project branch total_tasks completed remaining
   project=""
@@ -114,8 +115,6 @@ _notify_context() {
   printf '%b' "$ctx"
 }
 
-# Notify and exit. Replaces bare `exit` at termination points.
-# Usage: notify_and_exit <exit_code> <reason_title> <reason_detail> [priority]
 notify_and_exit() {
   local code="$1"
   local reason_title="$2"
@@ -179,7 +178,6 @@ set_paths() {
 }
 
 require_agents_file() {
-  # Soft requirement: prefer runner AGENTS, but do not stop the loop if missing.
   if [ ! -f "$RUNNER_AGENTS_FILE" ]; then
     echo "[Ralph][warn] Missing runner AGENTS at $RUNNER_AGENTS_FILE; will look for a target fallback." >&2
     return 1
@@ -196,35 +194,150 @@ require_runner_specs_dir() {
   return 0
 }
 
-collect_ralph_specs() {
-  local specs_dir="$RALPH_ROOT/ralph-specs"
-  if [ ! -d "$specs_dir" ]; then
-    echo "[Ralph][warn] Specs directory $specs_dir not found; skipping specs append." >&2
+# Detect project languages in the target repo and return matching RULES files.
+# Falls back to including all RULES files if detection is ambiguous.
+detect_language_rules() {
+  local rules_dir="$RALPH_ROOT/ralph-specs/code_generation_rules"
+  local detected=()
+
+  if [ ! -d "$rules_dir" ]; then
     return
   fi
 
-  # Deterministic ordering: limit to core instruction files and sort by relative path.
-  local files
-  IFS=$'\n' read -r -d '' -a files < <(printf "%s\n" \
-    "$specs_dir/AGENTS.md" \
-    "$specs_dir/prompt.md" \
-    "$specs_dir/code_generation_rules/RULES.md" \
-    "$specs_dir/code_generation_rules/RULES-dotnet.md" \
-    "$specs_dir/code_generation_rules/RULES-python.md" \
-    "$specs_dir/README.md" 2>/dev/null | awk 'NF' | sort -u && printf '\0') || true
+  # Always include the general rules file
+  if [ -f "$rules_dir/RULES.md" ]; then
+    echo "$rules_dir/RULES.md"
+  fi
 
-  local file rel
-  for file in "${files[@]}"; do
-    [ -f "$file" ] || continue
-    rel=${file#"$RALPH_ROOT/"}
-    printf '\n### Begin %s\n' "$rel"
-    cat "$file"
-    printf '\n### End %s\n' "$rel"
-  done
+  # Detect languages from target repo files
+  local has_dotnet=false has_python=false has_node=false
+
+  # Check for .NET
+  if compgen -G "$TARGET_REPO_ROOT/*.sln" >/dev/null 2>&1 || \
+     compgen -G "$TARGET_REPO_ROOT/*.csproj" >/dev/null 2>&1 || \
+     compgen -G "$TARGET_REPO_ROOT/**/*.csproj" >/dev/null 2>&1 || \
+     compgen -G "$TARGET_REPO_ROOT/src/**/*.csproj" >/dev/null 2>&1; then
+    has_dotnet=true
+  fi
+
+  # Check for Python
+  if [ -f "$TARGET_REPO_ROOT/pyproject.toml" ] || \
+     [ -f "$TARGET_REPO_ROOT/setup.py" ] || \
+     [ -f "$TARGET_REPO_ROOT/requirements.txt" ] || \
+     [ -f "$TARGET_REPO_ROOT/Pipfile" ]; then
+    has_python=true
+  fi
+
+  # Check for Node.js
+  if [ -f "$TARGET_REPO_ROOT/package.json" ]; then
+    has_node=true
+  fi
+
+  # Include matching language rules
+  if $has_dotnet && [ -f "$rules_dir/RULES-dotnet.md" ]; then
+    echo "$rules_dir/RULES-dotnet.md"
+  fi
+
+  if $has_python && [ -f "$rules_dir/RULES-python.md" ]; then
+    echo "$rules_dir/RULES-python.md"
+  fi
+
+  # Fallback: if nothing detected, include all language rules
+  if ! $has_dotnet && ! $has_python && ! $has_node; then
+    echo "[Ralph] No language detected; including all RULES files." >&2
+    for f in "$rules_dir"/RULES-*.md; do
+      [ -f "$f" ] && echo "$f"
+    done
+  fi
+}
+
+# Build the static portion of the prompt (instructions + rules).
+# Called once in main(). Per-iteration, only the task JSON and progress entry are injected.
+build_static_prompt() {
+  local prompt_block="" agents_block="" rules_block=""
+
+  # Resolve prompt file
+  if [ -n "$RESOLVED_PROMPT_FILE" ] && [ -f "$RESOLVED_PROMPT_FILE" ]; then
+    prompt_block=$(cat "$RESOLVED_PROMPT_FILE")
+  else
+    prompt_block="### Missing prompt instructions\nNo prompt.md was found; proceed with caution."
+  fi
+
+  # Resolve agents file (now a thin pointer, but still included for tools that use it)
+  if [ -n "$RESOLVED_AGENTS_FILE" ] && [ -f "$RESOLVED_AGENTS_FILE" ]; then
+    agents_block=$(cat "$RESOLVED_AGENTS_FILE")
+  else
+    agents_block=""
+  fi
+
+  # Collect language-specific rules (C1: only matching languages)
+  local rules_files
+  rules_files=$(detect_language_rules)
+  if [ -n "$rules_files" ]; then
+    local file rel
+    while IFS= read -r file; do
+      [ -f "$file" ] || continue
+      rel=${file#"$RALPH_ROOT/"}
+      rules_block+=$(printf '\n### Begin %s\n' "$rel")
+      rules_block+=$(cat "$file")
+      rules_block+=$(printf '\n### End %s\n' "$rel")
+    done <<< "$rules_files"
+  fi
+
+  # Host mode note injection
+  local host_mode_note=""
+  if [ "$HOST_MODE" = true ]; then
+    host_mode_note="**Host mode is active.** You may run tools, tests, and builds directly on the host without containers. Container wrapping is not required this session."
+  fi
+
+  # Assemble static prompt: agents identity (thin) + prompt directive + rules
+  # The prompt.md has {{HOST_MODE_NOTE}} placeholder for host-mode injection.
+  # Use perl to avoid bash ${//} issues with & and \ in replacement strings.
+  prompt_block=$(HOST_MODE_NOTE="$host_mode_note" perl -0777 -pe \
+    's/\Q{{HOST_MODE_NOTE}}\E/$ENV{HOST_MODE_NOTE}/g' <<< "$prompt_block")
+
+  if [ -n "$agents_block" ]; then
+    STATIC_PROMPT="$(printf "%s\n\n%s\n%s" "$agents_block" "$prompt_block" "$rules_block")"
+  else
+    STATIC_PROMPT="$(printf "%s\n%s" "$prompt_block" "$rules_block")"
+  fi
+
+  echo "[Ralph] Static prompt built ($(echo -n "$STATIC_PROMPT" | wc -c) bytes)" >&2
+}
+
+# Extract the full JSON object for the selected task from tasks.json.
+# Returns the complete task object with all fields (id, title, description, ACs, subtasks, keyFiles, etc.)
+extract_selected_task_json() {
+  local task_id="$1"
+
+  if [ -z "$task_id" ] || [ ! -f "$PRD_FILE" ]; then
+    echo "{}"
+    return
+  fi
+
+  jq --arg id "$task_id" '(.tasks // [])[] | select(.id == $id)' "$PRD_FILE" 2>/dev/null || echo "{}"
+}
+
+# Extract the last progress entry from progress.md for context injection.
+# Returns the last ## section (from last "## " heading to end or next "---").
+extract_last_progress_entry() {
+  if [ ! -f "$PROGRESS_FILE" ]; then
+    echo "(No progress history yet)"
+    return
+  fi
+
+  # Get everything after the last "## " heading
+  local last_entry
+  last_entry=$(awk '/^## /{buf=""; found=1} found{buf=buf ORS $0} END{if(found) print buf}' "$PROGRESS_FILE" 2>/dev/null || true)
+
+  if [ -z "$last_entry" ]; then
+    echo "(No progress entries yet)"
+  else
+    echo "$last_entry"
+  fi
 }
 
 require_prompt_file() {
-  # Soft requirement: prefer runner prompt, but do not stop the loop if missing.
   if [ ! -f "$PROMPT_FILE" ]; then
     echo "[Ralph][warn] Missing runner prompt at $PROMPT_FILE; will look for a target fallback." >&2
     return 1
@@ -359,6 +472,7 @@ announce_story_selection() {
 
   SELECTED_TASK_ID=""
   SELECTED_TASK_TITLE=""
+  SELECTED_TASK_JSON=""
   BLOCKED_IDS=""
   UNKNOWN_DEP_IDS=""
 
@@ -428,6 +542,9 @@ announce_story_selection() {
     return 0
   fi
 
+  # B1: Extract full task JSON for prompt injection
+  SELECTED_TASK_JSON=$(extract_selected_task_json "$SELECTED_TASK_ID")
+
   local selection_block
   selection_block=$(cat <<EOF
 >>> Task Selection (iteration $iteration)
@@ -454,6 +571,40 @@ EOF
   return 0
 }
 
+# Assemble the per-iteration prompt by injecting the selected task and recent progress
+# into the static prompt template.
+build_iteration_prompt() {
+  local task_json="$1"
+  local last_progress="$2"
+  local prompt="$STATIC_PROMPT"
+
+  # Replace the {{SELECTED_TASK}} placeholder with actual task JSON
+  local task_block
+  if [ -n "$task_json" ] && [ "$task_json" != "{}" ]; then
+    task_block=$(printf '```json\n%s\n```' "$task_json")
+  else
+    task_block="(No task injected — read .ralph/tasks.json to find the next unblocked task.)"
+  fi
+
+  # Replace the {{LAST_PROGRESS_ENTRY}} placeholder
+  local progress_block
+  if [ -n "$last_progress" ]; then
+    progress_block="$last_progress"
+  else
+    progress_block="(No progress history yet)"
+  fi
+
+  # Use perl for placeholder replacement to avoid bash ${//} mangling
+  # of & and \ characters in task JSON or progress text. Perl reads the
+  # replacement from env vars so no shell escaping issues arise.
+  prompt=$(TASK_BLOCK="$task_block" perl -0777 -pe \
+    's/\Q{{SELECTED_TASK}}\E/$ENV{TASK_BLOCK}/g' <<< "$prompt")
+  prompt=$(PROGRESS_BLOCK="$progress_block" perl -0777 -pe \
+    's/\Q{{LAST_PROGRESS_ENTRY}}\E/$ENV{PROGRESS_BLOCK}/g' <<< "$prompt")
+
+  printf '%s\n' "$prompt"
+}
+
 run_iteration() {
   local iteration="$1"
   local iter_start
@@ -464,32 +615,22 @@ run_iteration() {
   echo "  Ralph Iteration $iteration of $MAX_ITERATIONS ($TOOL)"
   echo "==============================================================="
 
-   announce_story_selection "$iteration"
+  announce_story_selection "$iteration"
 
   if [ -z "$SELECTED_TASK_ID" ]; then
     echo "[Ralph] No unblocked tasks available; stopping." >&2
     notify_and_exit 0 "Ralph: No Unblocked Tasks" "No unblocked tasks available; all tasks may be done or blocked.\nStopping at iteration $iteration." 0
   fi
 
-  local OUTPUT
+  # D4: Extract last progress entry for injection
+  local last_progress
+  last_progress=$(extract_last_progress_entry)
+
+  # Build the per-iteration prompt (static + task + progress)
   local merged_prompt
-  local agents_block prompt_block specs_block
+  merged_prompt=$(build_iteration_prompt "$SELECTED_TASK_JSON" "$last_progress")
 
-  if [ -n "$RESOLVED_AGENTS_FILE" ] && [ -f "$RESOLVED_AGENTS_FILE" ]; then
-    agents_block=$(cat "$RESOLVED_AGENTS_FILE")
-  else
-    agents_block="### Missing AGENTS instructions\nNo AGENTS.md was found; proceed with caution."
-  fi
-
-  if [ -n "$RESOLVED_PROMPT_FILE" ] && [ -f "$RESOLVED_PROMPT_FILE" ]; then
-    prompt_block=$(cat "$RESOLVED_PROMPT_FILE")
-  else
-    prompt_block="### Missing prompt instructions\nNo prompt.md was found; proceed with caution."
-  fi
-
-  specs_block=$(collect_ralph_specs)
-
-  merged_prompt="$(printf "%s\n\n%s\n%s" "$agents_block" "$prompt_block" "$specs_block")"
+  local OUTPUT
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
   elif [[ "$TOOL" == "claude" ]]; then
@@ -546,7 +687,7 @@ run_iteration() {
 }
 
 run_iterations() {
-  echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS"
+  echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS$([ "$HOST_MODE" = true ] && echo " [host-mode]")"
   for i in $(seq 1 "$MAX_ITERATIONS"); do
     run_iteration "$i"
   done
@@ -576,8 +717,13 @@ main() {
   init_progress_file
   init_suggestions_file
   validate_prd
+  # B3: Build the static prompt once (instructions + rules); task context injected per-iteration
+  build_static_prompt
   LOOP_START_SECS=$(date +%s)
   compute_total_tasks
+  if [ "$HOST_MODE" = true ]; then
+    echo "[Ralph] Host mode active: containers not required for tooling." >&2
+  fi
   run_iterations
 }
 

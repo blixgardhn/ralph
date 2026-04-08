@@ -23,6 +23,7 @@ Run Ralph from a sibling checkout (`../ralph`) against the current repo. Use whe
    ```
    - Replace `1` to change max iterations if needed.
    - Pass `--tool amp` or `--tool claude` to switch tools.
+   - Pass `--host-mode` to skip container wrapping when tools are installed locally.
 
 ## Notes
 

@@ -40,25 +40,31 @@ Create a clear, actionable PRD in markdown and a corresponding `.ralph/tasks.jso
      - Perform a final coherence read to ensure all applied suggestions are internally consistent.
      - Declare loop completion and produce a **role sign-off checklist** confirming each role has no remaining objections.
 
-   **Per-role document requirements:**
-   - Each role must produce a brief role-specific document stored alongside the PRD in `.ralph/prds/`.
-    - **Filename pattern:** `NNNN-role-<order>-<name>.md` (e.g., `0001-role-1-clarification.md`, `0001-role-7-domain-expert.md`). The order prefix preserves sequence and avoids collisions with the primary PRD file (`NNNN-prd-[feature-name].md`).
-   - **Required sections in each role doc:**
-     1. **Inputs consumed** — which prior role docs and user inputs were read.
-     2. **Decisions & changes** — what was decided or changed in the PRD/tasks.
-     3. **Task rewrites** — specific task additions, removals, splits, merges, or reorderings.
-     4. **Risks & open questions** — unresolved issues handed to the next role.
-     5. **Rationale** — why each decision was made (audit trail for the methodology).
-   - Every subsequent role must read all prior role documents as inputs to its own output.
+   **Role output requirements:**
+   - Roles run as a thinking/analysis process during PRD creation. Role outputs are **not** written as separate files.
+   - Instead, include a condensed **"Role Decisions"** section in the final PRD markdown that captures key decisions from each role (2–3 bullet points per role).
+   - The change ledger and role sign-off checklist are included in the PRD itself.
+   - Each role's analysis feeds into the next role's work, but the handoff is ephemeral (within the same session), not via separate documents.
 
 2. Generate the PRD in markdown using clarified inputs and the role outputs.
 3. Generate the matching `.ralph/tasks.json` (omit any priority fields; task selection is done per iteration by dependency/implementation flow).
+
+> **CRITICAL: Task array order IS the execution order.** The implementation loop selects tasks sequentially by their position in the `tasks` array (first unblocked, unpassed task wins). The implementing agent receives only its assigned task — it has no visibility into other tasks or the full PRD context. This means:
+> - Every task must be implementable using only the information in its own JSON object (title, description, ACs, subtasks, keyFiles, implementationNotes) plus what it can discover in the codebase.
+> - If task N depends on artifacts created by task M, then M must appear before N in the array.
+> - A task must never assume that a later task will fix something it left incomplete.
+> - The ordering must survive a "fresh eyes" test: a developer who knows nothing about the project should be able to execute task N after tasks 1 through N-1 are done, using only the task's own description.
 4. After the first full pass, review the PRD task list and split any broad tasks into focused jobs that are deterministic, testable, individually committable, and small enough for a junior developer to pick up without needing deep system or domain knowledge.
 5. Save both outputs; ensure every task in `tasks.json` traces back to one or more functional requirements in the PRD and that all requirements are covered by at least one task.
 6. Keep tasks minimal and focused; split aggressively so each task fits in one iteration, but if two very small tasks fit naturally together and avoid reloading the same context, combine them into one task.
 7. Ensure the PRD depth and task list size mirror the complexity of the application being specified; right-size scope so complexity is captured without over- or under-splitting.
-8. Before finalizing the PRD, take a high-level pass over all tasks to ensure they fit together coherently and reorder them based on dependencies and implementation flow; the order must make sense end-to-end.
-9. During that pass, if any subtasks are large enough to stand alone, promote them to tasks, then re-run the overview and reorder as needed.
+8. **Ordering pass (mandatory).** Before finalizing, walk through every task in sequence and verify:
+   - Can this task be implemented right now, given only what the previous tasks produced?
+   - Does it create/modify files that later tasks depend on?
+   - Are there any circular or out-of-order dependencies?
+   - Would a developer with no project knowledge be able to start this task after the previous ones are done?
+   Reorder until the sequence passes all four checks. The canonical dependency order is: scaffold → config/schema → data layer → backend/service/API → UI/presentation → validation/edge cases → integration tests → docs/ops.
+9. During that pass, if any subtasks are large enough to stand alone, promote them to tasks, then re-run the ordering pass.
 10. After creating tasks, sanity-check each one for clarity and scope: a non-expert should be able to execute it without learning more of the system or domain than necessary.
 11. If the project lacks a minimal scaffold (or more), include an initial task to create it so later tasks have a foundation.
 12. For each task, include a short list of concrete subtasks to maximize planning before implementation starts; keep subtasks actionable and scoped to that task.
@@ -67,9 +73,11 @@ Create a clear, actionable PRD in markdown and a corresponding `.ralph/tasks.jso
 ### Mini-PRD Path (Trivial Scope)
 
 When the scope is truly tiny (e.g., a config tweak, a single-file rename, a one-endpoint addition):
-- Allow 3–4 tasks minimum; still require boilerplate ACs and the role loop (one pass is acceptable if no issues surface).
+- Allow 1–4 tasks; no artificial minimum if the work genuinely fits in fewer tasks.
+- Use only 4 essential roles: **Clarification Agent**, **Scope & Story Engineer**, **Codebase Pattern Analyst**, **Final Formatter & Orchestrator**. Skip Feasibility, QA, and Domain Expert for genuinely trivial scope.
+- One review pass is acceptable if no issues surface.
 - Document the rationale for choosing the mini-PRD path in the PRD introduction.
-- All other rules (requirement coverage checklist, mandatory ACs, per-role docs) still apply.
+- All other rules (requirement coverage checklist, mandatory ACs, role decisions in PRD) still apply.
 
 ### Methodology-Specific AC Constraints
 
@@ -84,6 +92,9 @@ Hard constraints on task composition:
 - **Schema + UI in one task is banned.** Separate data-layer changes from presentation changes.
 - **Seed data/fixtures must be enumerated per task** when ACs depend on preloaded data; do not leave seed data as an afterthought.
 - **Documentation task required** when user-facing behavior changes (e.g., new CLI flags, API endpoints, UI flows).
+- **Maximum 5 acceptance criteria per task** (excluding boilerplate ACs like "Typecheck passes" and "Tests pass"). If more are needed, split the task.
+- **Maximum 6 subtasks per task.** If you cannot scope subtasks without crossing boundaries, split the task.
+- **Tasks must be self-contained and focused.** Each task should be implementable without needing deep knowledge of other unfinished tasks. The implementation agent receives only the task JSON, not the full PRD context.
 
 **Important:** Do NOT implement the feature. Deliver specs only. No code changes, no file creation beyond the PRD and tasks.json artifacts, no "getting started" on the first task. Implementation is handled by separate Ralph iteration agents after the PRD is reviewed. This separation is fundamental to the methodology — planning and implementation are distinct phases run by different agent instances.
 
@@ -201,11 +212,13 @@ Task format:
 ### Conversion and Sizing Rules
 - Target 6–10 tasks for a typical feature; never fewer than 4 unless the feature is truly tiny.
 - Each task must fit in one Ralph iteration (~1–2 hours). If it needs backend + UI + docs, split.
-- Split by dependency order: schema → backend/service/API → UI → validation/edge cases → docs/ops.
-- If no scaffold exists, the first task should create a minimal one (or more) so downstream tasks have a base.
+- **Task array position is the execution order.** The first unpassed task in the array is always the next to be implemented. Order tasks so each one builds on the outputs of its predecessors.
+- Split by dependency order: scaffold → config/schema → data layer → backend/service/API → UI/presentation → validation/edge cases → integration tests → docs/ops.
+- If no scaffold exists, the first task must create a minimal one so downstream tasks have a foundation to build on.
 - If a task spans multiple boundaries (DB + API + UI) or has >4 acceptance criteria, split it.
 - Schema+UI in one task is not allowed—separate data changes from presentation changes.
-- IDs sequential (T-001...); task order follows dependency and implementation flow. Do not add priority fields—selection happens at runtime based on dependencies/flow.
+- IDs sequential (T-001...); task order follows dependency and implementation flow. Do not add priority fields—selection happens at runtime based on array position.
+- **Self-contained tasks.** Each task must be implementable by an agent that can only see that task's JSON (plus the codebase as left by previous tasks). Include enough context in `description`, `implementationNotes`, and `subtasks` for the task to be executed without referencing the PRD or other tasks.
 - Every task has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI; add "Spec gaps recorded and resolved" when touching ambiguous areas; add "Containerized execution verified" when introducing new build/run/test commands.
 - `branchName` = `ralph/prd-<NNNN>-<feature-name-kebab-case>` (must include PRD ID for provenance).
 - Include seed data requirements when acceptance tests need preloaded data.
@@ -219,7 +232,6 @@ Task format:
 
 - **Markdown PRD:** `.ralph/prds/NNNN-prd-[feature-name].md` (next zero-padded number)
 - **Ralph JSON:** `.ralph/tasks.json` in repo root
-- **Role docs:** `.ralph/prds/NNNN-role-<order>-<name>.md` per role (1–8; see per-role document requirements above)
 - Tasks exist to realize and support the PRD's functional requirements; a single requirement may need multiple tasks, and that is expected
 - Every task must trace back to at least one functional requirement; every functional requirement must be covered by at least one task
 - Task IDs, titles, and acceptance criteria in `tasks.json` are authoritative for implementation; the PRD provides the requirements context and rationale
@@ -233,7 +245,9 @@ Run this checklist after producing both files:
 
 - [ ] Every task in tasks.json traces back to at least one functional requirement in the PRD
 - [ ] Every functional requirement in the PRD is covered by at least one task in tasks.json
-- [ ] Task order reflects dependency and implementation flow
+- [ ] **Task array order is correct**: each task can be implemented after its predecessors without forward references
+- [ ] **Each task is self-contained**: description + ACs + subtasks + keyFiles + implementationNotes are sufficient for an agent with no PRD context
+- [ ] No task depends on artifacts from a task that appears later in the array
 - [ ] Every task has `Typecheck passes` AC
 - [ ] Every task with testable logic has `Tests pass` AC
 - [ ] Every UI task has `Verify in browser using dev-browser skill` AC
@@ -256,7 +270,7 @@ Run this checklist after producing both files:
 1. Read current `tasks.json`
 2. If `branchName` differs and `progress.md` has content beyond its header:
    - Create `archive/YYYY-MM-DD-prd-<NNNN>-[feature-name]/`
-   - Copy `tasks.json`, `progress.md`, and all role docs for that PRD there
+   - Copy `tasks.json` and `progress.md` there
    - Reset `progress.md` header
 
 ---
@@ -269,16 +283,18 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 
 ## Final Checklist (both files must pass)
 
-- [ ] **No implementation was performed** — only PRD markdown, tasks.json, and role docs were produced; no feature code was written or modified
+- [ ] **No implementation was performed** — only PRD markdown and tasks.json were produced; no feature code was written or modified
 - [ ] Clarifying questions asked and answered (lettered options)
 - [ ] Tasks are small, ordered by dependency, and every functional requirement is covered by at least one task
+- [ ] **Sequential execution verified**: each task can be implemented after its predecessors without forward references
+- [ ] **Tasks are self-contained**: each task's JSON is sufficient for an isolated agent to implement it
 - [ ] Every task has verifiable acceptance criteria with required boilerplate lines (typecheck, tests, browser, spec gaps, container as applicable)
 - [ ] No task mixes schema/data-layer with UI/presentation changes
 - [ ] Every task has `keyFiles` and `implementationNotes` populated (by Codebase Pattern Analyst)
 - [ ] Seed data/fixtures enumerated per task where ACs depend on them
 - [ ] Functional requirements are numbered; non-goals set boundaries
 - [ ] Files saved to `.ralph/prds/NNNN-prd-[feature].md` and `.ralph/tasks.json`
-- [ ] Per-role docs saved to `.ralph/prds/NNNN-role-<order>-<name>.md` with required sections
+- [ ] PRD includes "Role Decisions" section with key decisions from each role
 - [ ] `branchName` includes PRD ID (`ralph/prd-<NNNN>-<slug>`)
 - [ ] Requirement coverage / QA checklist passed (see Step 4)
 - [ ] Role sign-off checklist complete; change ledger present
