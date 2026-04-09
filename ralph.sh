@@ -622,6 +622,21 @@ run_iteration() {
     notify_and_exit 0 "Ralph: No Unblocked Tasks" "No unblocked tasks available; all tasks may be done or blocked.\nStopping at iteration $iteration." 0
   fi
 
+  # Stuck-task detection: same task selected repeatedly without progress
+  if [ "$SELECTED_TASK_ID" = "$LAST_SELECTED_TASK" ]; then
+    SAME_TASK_COUNT=$((SAME_TASK_COUNT + 1))
+  else
+    SAME_TASK_COUNT=1
+    LAST_SELECTED_TASK="$SELECTED_TASK_ID"
+  fi
+  if [ "$SAME_TASK_COUNT" -ge "$MAX_SAME_TASK" ]; then
+    echo "[Ralph] Task $SELECTED_TASK_ID selected $SAME_TASK_COUNT consecutive times without completing. Halting." >&2
+    notify_and_exit 1 \
+      "Ralph: Stuck Task" \
+      "Task $SELECTED_TASK_ID selected $SAME_TASK_COUNT times without progress.\nAgent may be blocked on a task it cannot complete autonomously." \
+      1
+  fi
+
   # D4: Extract last progress entry for injection
   local last_progress
   last_progress=$(extract_last_progress_entry)
@@ -671,6 +686,21 @@ run_iteration() {
   fi
 
   record_suggestions "$iteration" "continued" "$OUTPUT"
+
+  # Reset stuck-task counter if the agent signaled TASK_COMPLETE or the task
+  # flipped to passes:true (covers cases where the agent completes but the
+  # promise tag is slightly malformed).
+  if echo "$OUTPUT" | grep -q "<promise>TASK_COMPLETE</promise>"; then
+    SAME_TASK_COUNT=0
+  elif command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ] && [ -n "$SELECTED_TASK_ID" ]; then
+    local task_passes
+    task_passes=$(jq -r --arg id "$SELECTED_TASK_ID" \
+      '(.tasks // [])[] | select(.id == $id) | .passes // false' "$PRD_FILE" 2>/dev/null || echo "false")
+    if [ "$task_passes" = "true" ]; then
+      SAME_TASK_COUNT=0
+    fi
+  fi
+
   local iter_end elapsed loop_elapsed remaining_tasks completed_tasks
   iter_end=$(date +%s)
   elapsed=$((iter_end - iter_start))
@@ -688,6 +718,13 @@ run_iteration() {
 
 run_iterations() {
   echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS$([ "$HOST_MODE" = true ] && echo " [host-mode]")"
+
+  # Stuck-task detection: halt if the same task is selected too many times
+  # without completing. Guards against agents that fail to emit <promise>STOP</promise>.
+  LAST_SELECTED_TASK=""
+  SAME_TASK_COUNT=0
+  MAX_SAME_TASK=3
+
   for i in $(seq 1 "$MAX_ITERATIONS"); do
     run_iteration "$i"
   done
