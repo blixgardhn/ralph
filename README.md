@@ -126,6 +126,9 @@ docker compose run --rm app
 
 # Run the tests
 docker compose run --rm test
+
+# Open in VS Code to browse the generated files
+code .
 ```
 
 ## Prerequisites
