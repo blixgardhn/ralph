@@ -31,7 +31,7 @@ Verify with `docker compose version`.
 curl -fsSL https://opencode.ai/install | bash
 ```
 
-Verify with `opencode --version`. If you have a GitHub Copilot subscription, models are available out of the box — no extra API keys needed. You also need `jq` and `git`:
+Verify with `opencode --version`. A [GitHub Copilot](https://github.com/features/copilot) subscription is required — once set up, models are available out of the box with no extra API keys. You also need `jq` and `git`:
 
 ```bash
 sudo apt install jq git
