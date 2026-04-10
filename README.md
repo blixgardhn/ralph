@@ -218,6 +218,33 @@ docker build \
   -f ralph-specs/resources/Dockerfile.template .
 ```
 
+### Organization-specific settings
+
+If you're running Ralph inside a corporate environment, you may need to configure some or all of the following:
+
+**Container CA certificates** — If your network uses a TLS-intercepting proxy or internal PKI, containers won't be able to reach package registries or external APIs without the CA certs. Pass them via the Dockerfile build args shown above.
+
+**Private NuGet feeds (.NET)** — Edit `ralph-specs/resources/nuget.config` and set the `NUGET_PRIVATE_FEED_URL` and `NUGET_API_KEY` environment variables:
+
+```bash
+export NUGET_PRIVATE_FEED_URL="https://your-org.example.com/nuget/v3/index.json"
+export NUGET_API_KEY="your-api-key"
+```
+
+**HTTP/HTTPS proxy** — If containers need a proxy for outbound access, pass standard proxy env vars when running containers:
+
+```bash
+docker run --rm \
+  -e HTTP_PROXY=http://proxy.example.com:8080 \
+  -e HTTPS_PROXY=http://proxy.example.com:8080 \
+  -e NO_PROXY=localhost,127.0.0.1,.example.com \
+  ...
+```
+
+**OpenCode external directories** — If your target repos live outside the default working directory, add them to `external_directory` in `~/.config/opencode/opencode.json` (see [OpenCode Configuration](#opencode-configuration) above).
+
+**Custom AI providers** — If your org runs local LLMs (Ollama, vLLM, OpenWebUI, etc.), add them under the `"provider"` key in `opencode.json`. Keep API keys in environment variables rather than in the config file.
+
 ### Feedback loops
 
 Ralph relies on automated feedback:
