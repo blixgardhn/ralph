@@ -6,6 +6,35 @@ Ralph is an autonomous AI agent loop that runs coding tools ([OpenCode](https://
 
 ## Quick Start
 
+### 0. Prerequisites
+
+**WSL (Windows users):** Ralph runs in a Linux shell. If you're on Windows, install [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) first and run everything below inside your WSL distro:
+
+```powershell
+wsl --install
+```
+
+**Docker Desktop / Docker Compose:** Ralph runs all builds, tests, and installs inside containers. Install [Docker Desktop](https://docs.docker.com/desktop/) (Windows/Mac — includes Compose) or on Linux:
+
+```bash
+sudo apt install docker.io docker-compose-v2
+sudo usermod -aG docker $USER   # then log out and back in
+```
+
+Verify with `docker compose version`.
+
+**OpenCode:** Ralph's default AI coding tool. Install it inside WSL / your Linux shell:
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+```
+
+Verify with `opencode --version`. You also need `jq` and `git`:
+
+```bash
+sudo apt install jq git
+```
+
 ### 1. Clone Ralph alongside your project
 
 ```bash
@@ -70,10 +99,12 @@ Ralph creates a feature branch, works through tasks one per iteration, and stops
 
 ## Prerequisites
 
-- [OpenCode CLI](https://opencode.ai) (default), [Amp CLI](https://ampcode.com), or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- Docker or Podman with Compose support
-- `jq` (`apt install jq` or `brew install jq`)
-- A git repository for your project
+See [Quick Start step 0](#0-prerequisites) for installation instructions. In summary:
+
+- **WSL 2** (Windows users only)
+- **Docker** with Compose support (`docker compose version` must work)
+- **OpenCode CLI** ([opencode.ai](https://opencode.ai)) — or alternatively [Amp](https://ampcode.com) / [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+- **jq** and **git**
 
 ## OpenCode Configuration
 
