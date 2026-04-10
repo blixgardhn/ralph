@@ -37,7 +37,7 @@ Verify with `opencode --version`. You also need `jq` and `git`:
 sudo apt install jq git
 ```
 
-### 1. Clone Ralph and set up a test project
+### 1. Clone Ralph and create a project
 
 ```bash
 # Clone Ralph
@@ -48,12 +48,10 @@ git clone https://github.com/blixgardhn/ralph.git
 cd ralph
 ./scripts/install_ralph_skills.sh
 
-# Create a hello-world .NET project (using a container — no .NET SDK needed on host)
+# Create an empty project repo
 cd ~/projects
 mkdir hello-ralph && cd hello-ralph
-docker run --rm -v "$PWD":/app -w /app mcr.microsoft.com/dotnet/sdk:9.0 \
-  dotnet new console -n HelloRalph -o .
-git init && git add -A && git commit -m "Initial scaffold"
+git init
 ```
 
 ### 2. Configure OpenCode permissions
@@ -85,23 +83,27 @@ If your org uses a TLS-intercepting proxy, private package feeds, or custom AI p
 
 ### 3. Create a PRD
 
-Open OpenCode in your project and ask it to create a PRD:
+From inside your project directory, open OpenCode and describe what you want to build:
 
 ```bash
 cd ~/projects/hello-ralph
 opencode
 ```
 
-Then type:
-
 ```
-Load the prd skill and create a PRD for "Add a greeting feature to the
-HelloRalph console app: prompt the user for their name and print
-'Hello, <name>! Welcome to Ralph.' Add a unit test project with xUnit
-that verifies the greeting output."
+Create a .NET 9 console app called HelloRalph that prompts the user for
+their name and prints "Hello, <name>! Welcome to Ralph." Include an xUnit
+test project that verifies the greeting output.
 ```
 
-Answer the clarifying questions. The skill produces `.ralph/tasks.json` with ordered tasks. Review the tasks, then exit OpenCode.
+The installed PRD skill triggers automatically. Answer the clarifying questions. When done, the skill produces `.ralph/tasks.json` with ordered, self-contained tasks. Review them, then exit OpenCode.
+
+Or use the CLI one-liner:
+
+```bash
+cd ~/projects/hello-ralph
+opencode run 'Create a .NET 9 console app called HelloRalph that prompts the user for their name and prints "Hello, <name>! Welcome to Ralph." Include an xUnit test project that verifies the greeting output.'
+```
 
 ### 4. Run Ralph
 
@@ -110,7 +112,7 @@ cd ~/projects/hello-ralph
 ../ralph/ralph.sh --target-repo .
 ```
 
-Ralph creates a feature branch, works through each task (implement, build, test — all inside containers), and stops when all tasks pass. Watch the progress in the terminal.
+Ralph creates a feature branch, works through each task (scaffold, implement, build, test — all inside containers), and stops when all tasks pass. Watch the progress in the terminal.
 
 When it finishes, check the result:
 
