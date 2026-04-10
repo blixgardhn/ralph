@@ -93,7 +93,8 @@ opencode
 ```
 Create a .NET 9 console app called HelloRalph that prompts the user for
 their name and prints "Hello, <name>! Welcome to Ralph." Include an xUnit
-test project that verifies the greeting output.
+test project that verifies the greeting output. The app and tests should
+be runnable via docker compose (include a docker-compose.yml and Dockerfile).
 ```
 
 The installed PRD skill triggers automatically. Answer the clarifying questions. When done, the skill produces `.ralph/tasks.json` with ordered, self-contained tasks. Review them, then exit OpenCode.
@@ -102,7 +103,7 @@ Or use the CLI one-liner:
 
 ```bash
 cd ~/projects/hello-ralph
-opencode run 'Create a .NET 9 console app called HelloRalph that prompts the user for their name and prints "Hello, <name>! Welcome to Ralph." Include an xUnit test project that verifies the greeting output.'
+opencode run 'Create a .NET 9 console app called HelloRalph that prompts the user for their name and prints "Hello, <name>! Welcome to Ralph." Include an xUnit test project that verifies the greeting output. The app and tests should be runnable via docker compose (include a docker-compose.yml and Dockerfile).'
 ```
 
 ### 4. Run Ralph
@@ -120,13 +121,11 @@ When it finishes, check the result:
 # See what Ralph built
 git log --oneline
 
-# Run it
-docker run --rm -v "$PWD":/app -w /app mcr.microsoft.com/dotnet/sdk:9.0 \
-  dotnet run
+# Run the app
+docker compose run --rm app
 
 # Run the tests
-docker run --rm -v "$PWD":/app -w /app mcr.microsoft.com/dotnet/sdk:9.0 \
-  dotnet test
+docker compose run --rm test
 ```
 
 ## Prerequisites
