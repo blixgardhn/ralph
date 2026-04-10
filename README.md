@@ -109,7 +109,7 @@ opencode run 'Create a .NET 9 console app called HelloRalph that prompts the use
 
 ```bash
 cd ~/projects/hello-ralph
-../ralph/ralph.sh --target-repo .
+../ralph/ralph.sh
 ```
 
 Ralph creates a feature branch, works through each task (scaffold, implement, build, test — all inside containers), and stops when all tasks pass. Watch the progress in the terminal.
