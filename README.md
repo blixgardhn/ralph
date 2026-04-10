@@ -2,192 +2,267 @@
 
 ![Ralph](ralph.webp)
 
-Ralph is an autonomous AI agent loop that runs AI coding tools (OpenCode by default, or [Amp](https://ampcode.com)/[Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all PRD items are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.md`, and `tasks.json`.
+Ralph is an autonomous AI agent loop that runs coding tools ([OpenCode](https://opencode.ai), [Amp](https://ampcode.com), or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) repeatedly until all tasks are complete. Each iteration is a fresh instance with clean context. Memory persists via git history, `progress.md`, and `tasks.json`.
 
-Inspired by [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
+## Quick Start
 
-All project dependency installation, linting, testing, builds, and database seeding must run inside containers (Docker/Podman/Compose). Keep the host clean of project toolchains. For images that need outbound network access, include the certificate install RUN block from `ralph/resources/Dockerfile.dotnet`/`ralph/resources/Dockerfile.template` to ensure proxy/interception certs are trusted. Do not link directly to files in `ralph/resources`; copy the needed content into the target project because that code has no access to runner-only files (they are not secret).
+```bash
+# 1. Create a PRD (interactive — run inside your AI coding tool)
+#    Load the prd skill and create a PRD for "your feature description"
 
-**Path boundaries (very important):** On startup Ralph sets two roots and keeps them separate:
-- `RALPH_ROOT`: the runner checkout; all runner-owned instructions, prompts, rules, and resources live here. Nothing is written inside `RALPH_ROOT` at runtime.
-- `TARGET_REPO_ROOT`: the project repository you pass via `--target-repo`; all PRD/task/progress/suggestions files live under this root (e.g., `TARGET_REPO_ROOT/.ralph/tasks.json`).
-Ralph reads runner files only from `RALPH_ROOT` and writes all iteration artifacts only under `TARGET_REPO_ROOT`. Avoid mixing paths to prevent missing-file confusion at runtime. Do not target the runner repo itself as the `--target-repo`; the script will exit to prevent writing into `RALPH_ROOT`.
+# 2. Run Ralph against your project
+../ralph/ralph.sh --target-repo /path/to/your/project
+```
+
+Ralph reads tasks from `.ralph/tasks.json` in the target repo and works through them one per iteration until all pass.
 
 ## Prerequisites
 
-- Docker or Podman with Compose support (all installs/tests/builds run in containers)
-- One of the following AI coding tools installed and authenticated on the host (OpenCode is the default):
-  - OpenCode CLI
+- **AI coding tool** (one of):
+  - [OpenCode CLI](https://opencode.ai) (default)
   - [Amp CLI](https://ampcode.com)
-  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
-- `jq` installed on the host (`brew install jq` on macOS)
+  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+- **Docker or Podman** with Compose support (all builds/tests/installs run in containers)
+- **jq** (`apt install jq` or `brew install jq`)
 - A git repository for your project
 
-Project dependencies, linting, testing, builds, and database seeding must be executed via container entrypoints (e.g., `docker compose run` / `podman compose run`). Do not install project toolchains on the host.
+## OpenCode Configuration
 
-### Pushover Notifications (Optional)
+Ralph invokes OpenCode in non-interactive piped mode (`opencode run --model <model>`). For this to work without manual approval prompts, your OpenCode config must grant all tool permissions.
 
-Ralph can send push notifications via [Pushover](https://pushover.net) when the loop terminates (all tasks complete, agent stop, max iterations, or errors) and when the PRD skill finishes generating specs.
-
-Set these environment variables to enable notifications:
-
-```bash
-export PUSHOVER_TOKEN="your-pushover-app-token"
-export PUSHOVER_USER_KEY="your-pushover-user-key"
-```
-
-Optional variables:
-- `PUSHOVER_DEVICE` - target a specific device (default: all)
-- `PUSHOVER_SOUND` - notification sound name (default: pushover)
-
-If the variables are not set, notifications are silently skipped. The script `scripts/notify.sh` can also be called standalone for custom notifications.
-
-## Setup
-
-### Option 1: Copy to your project
-
-Copy the ralph files into your project:
-
-```bash
-# From your project root
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
-
-# Copy the prompt template:
-cp /path/to/ralph/ralph-specs/prompt.md scripts/ralph/prompt.md
-
-chmod +x scripts/ralph/ralph.sh
-```
-
-Run project commands through container entrypoints (docker compose / podman compose). Keep project dependencies out of the host.
-
-Minimal dry run: a sample PRD lives at `.ralph/tasks.json` with `branchName` `ralph/example`. Switch to that branch, then run `./ralph.sh --target-repo $(pwd)` to exercise the loop end-to-end.
-
-When you start a new PRD (or edit the current `tasks.json`), Ralph auto-archives the previous run’s `tasks.json` and `progress.md` into `archive/YYYY-MM-DD-<branch>/` and resets `progress.md` so each requirement set stays isolated.
-
-### Option 2: Install skills globally (Amp/Claude)
-
-Copy the skills to your Amp or Claude config for use across all projects:
-
-For AMP
-```bash
-cp -r skills/prd ~/.config/amp/skills/
-cp -r skills/ralph_prd ~/.config/amp/skills/
-```
-
-For Claude Code (manual)
-```bash
-cp -r skills/prd ~/.claude/skills/
-cp -r skills/ralph_prd ~/.claude/skills/
-```
-
-### Configure Amp auto-handoff (recommended)
-
-Add to `~/.config/amp/settings.json`:
+Create or edit `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "amp.experimental.autoHandoff": { "context": 90 }
+  "$schema": "https://opencode.ai/config.json",
+  "model": "github-copilot/gpt-5.1-codex-max",
+  "permission": {
+    "read": "allow",
+    "list": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "edit": "allow",
+    "bash": "allow",
+    "webfetch": "allow"
+  }
 }
 ```
 
-This enables automatic handoff when context fills up, allowing Ralph to handle large stories that exceed a single context window.
+### Key points
+
+- **All tool permissions must be `"allow"`.** If any permission is missing or set to `"deny"`, the agent will hang waiting for interactive approval that never comes in piped mode.
+- **`external_directory`** — if your target repo is outside OpenCode's default working directory, add it here:
+  ```json
+  "external_directory": {
+    "/path/to/your/projects/**": "allow"
+  }
+  ```
+- **Model** — Ralph defaults to `github-copilot/gpt-5.1-codex-max`. Override with `--opencode-model <model>` or the `OPENCODE_MODEL` env var.
+- **Custom providers** — you can add providers (OpenAI, Ollama, etc.) under the `"provider"` key. Keep API keys out of this file if you plan to share your config; use environment variables instead.
+- **Duplicate JSON keys** — JSON parsers take the last value for duplicate keys. If you have per-path permission overrides, ensure they don't get silently overridden by a later blanket rule.
+
+### Comparison with other tools
+
+| Tool | Permission mechanism |
+|------|---------------------|
+| OpenCode | `~/.config/opencode/opencode.json` permissions block |
+| Amp | `--dangerously-allow-all` flag (passed automatically by Ralph) |
+| Claude Code | `--dangerously-skip-permissions` flag (passed automatically by Ralph) |
+
+OpenCode is the only tool where permissions are configured externally rather than via a CLI flag. If Ralph hangs during an iteration with no output, check your permissions config first.
+
+## Setup
+
+### Option 1: Clone alongside your project (recommended)
+
+```bash
+# Clone Ralph next to your project
+cd /path/to/your/projects
+git clone https://github.com/blixgardhn/ralph.git
+
+# Run against your project
+cd your-project
+../ralph/ralph.sh --target-repo .
+```
+
+Ralph resolves two path roots on startup:
+- `RALPH_ROOT` — the Ralph checkout (instructions, prompts, rules, resources). Nothing is written here at runtime.
+- `TARGET_REPO_ROOT` — your project repo. All artifacts (`.ralph/tasks.json`, `.ralph/progress.md`, commits) are written here.
+
+### Option 2: Install skills globally
+
+Use the installer to copy skills to all supported tools:
+
+```bash
+./scripts/install_ralph_skills.sh
+```
+
+This installs to:
+- OpenCode: `~/.config/opencode/skills/`
+- Amp: `~/.config/amp/skills/`
+- Claude Code: `~/.claude/skills/`
+
+Or copy manually for a single tool:
+
+```bash
+# OpenCode
+cp -r skills/prd ~/.config/opencode/skills/
+cp -r skills/ralph_runner ~/.config/opencode/skills/
+
+# Amp
+cp -r skills/prd ~/.config/amp/skills/
+cp -r skills/ralph_runner ~/.config/amp/skills/
+
+# Claude Code
+cp -r skills/prd ~/.claude/skills/
+cp -r skills/ralph_runner ~/.claude/skills/
+```
 
 ## Workflow
 
 ### 1. Create a PRD
 
-Use the PRD skill to generate a detailed requirements document:
+Inside your AI coding tool, load the PRD skill:
 
 ```
 Load the prd skill and create a PRD for [your feature description]
 ```
 
-Answer the clarifying questions. The skill saves output to `.ralph/prds/NNNN-prd-[feature-name].md` and `.ralph/tasks.json`.
+Answer the clarifying questions. The skill produces:
+- `.ralph/prds/NNNN-prd-[feature-name].md` — the requirements document
+- `.ralph/tasks.json` — tasks structured for autonomous execution
 
-Before finalizing, take a high-level pass across all tasks: make sure they fit together, reorder them if dependencies or narrative flow suggest a better sequence, and promote any oversized subtasks into standalone tasks, then re-run the overview and ordering.
+The PRD skill runs 8 specialized roles (clarification, scope, feasibility, codebase analysis, quality review, domain validation, and formatting) to produce well-ordered, self-contained tasks.
 
-### 2. Convert PRD to Ralph format
-
-Use the Ralph skill to convert the markdown PRD to JSON:
-
-```
-Load the ralph skill and convert prds/NNNN-prd-[feature-name].md to tasks.json
-```
-
-This creates `.ralph/tasks.json` with tasks structured for autonomous execution.
-
-### Quick start (minimal example)
+### 2. Run Ralph
 
 ```bash
-# 1) Create PRD (interactive, uses prd skill)
-Load the prd skill and create a PRD for "[your feature description]". It writes `.ralph/prds/NNNN-prd-[feature].md` and `.ralph/tasks.json`.
+# OpenCode (default)
+../ralph/ralph.sh --target-repo /path/to/your/project
 
-# 2) (optional legacy) Convert existing PRD to JSON
-If you have an older markdown PRD, convert it to `.ralph/tasks.json` using the ralph skill; save the markdown under `.ralph/prds/`.
+# Amp
+../ralph/ralph.sh --tool amp --target-repo /path/to/your/project
 
-# 3) Run Ralph against your project repo
-./ralph.sh --target-repo /path/to/your/repo
+# Claude Code
+../ralph/ralph.sh --tool claude --target-repo /path/to/your/project
+
+# Host mode (skip containers, run tools directly on host)
+../ralph/ralph.sh --host-mode --target-repo /path/to/your/project
 ```
 
-### 3. Run Ralph
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tool` | `opencode` | AI tool to use (`opencode`, `amp`, `claude`) |
+| `--target-repo` | current directory | Path to the project repository |
+| `--host-mode` | off | Skip container wrapping; run builds/tests directly on host |
+| `--opencode-model` | `github-copilot/gpt-5.1-codex-max` | Override the OpenCode model |
+| `[max_iterations]` | `30` | Maximum number of iterations |
+
+### What Ralph does each iteration
+
+1. Create/switch to the feature branch (from `branchName` in tasks.json)
+2. Select the next unblocked task where `passes: false`
+3. Inject the task JSON and recent progress into the prompt
+4. Run the AI tool to implement the task
+5. Verify (tests, typecheck, build — in containers by default)
+6. Commit if checks pass
+7. Mark the task `passes: true` in `.ralph/tasks.json`
+8. Append learnings to `.ralph/progress.md`
+9. Repeat until all tasks pass or max iterations reached
+
+### Stop conditions
+
+- **All tasks pass** — agent outputs `<promise>COMPLETE</promise>`, loop exits successfully.
+- **Agent blocked** — agent outputs `<promise>STOP</promise>`, loop exits with what was tried.
+- **Stuck task** — if the same task is selected 3 consecutive times without completing, Ralph halts to prevent infinite loops.
+- **Max iterations** — hard limit (default 30).
+
+## How It Works
+
+### Fresh context per iteration
+
+Each iteration spawns a new AI instance with clean context. The only memory between iterations is:
+- Git history (commits from previous iterations)
+- `.ralph/progress.md` (learnings and context)
+- `.ralph/tasks.json` (which tasks are done)
+
+### Small, self-contained tasks
+
+Each task should be small enough to complete in one context window. The implementing agent receives only its assigned task JSON — it has no visibility into other tasks or the full PRD.
+
+Right-sized tasks:
+- Add a database column and migration
+- Add a UI component to an existing page
+- Update a server action with new logic
+
+Too big (split these):
+- "Build the entire dashboard"
+- "Add authentication"
+- "Refactor the API"
+
+### Codebase pattern analysis
+
+During PRD creation, the Codebase Pattern Analyst role reads your codebase and populates `keyFiles` and `implementationNotes` on each task. This lets the iteration agent skip file discovery and start implementing immediately.
+
+### Containers
+
+All installs, tests, builds, and seeding run in containers by default. Use `--host-mode` to bypass this when tools are installed locally. The Dockerfiles in `ralph-specs/resources/` support corporate CA certificates via build args:
 
 ```bash
-# Using OpenCode (default)
-./scripts/ralph/ralph.sh [max_iterations]
-
-# Using Amp
-./scripts/ralph/ralph.sh --tool amp [max_iterations]
-
-# Using Claude Code
-./scripts/ralph/ralph.sh --tool claude [max_iterations]
-
-# Host mode (skip containers, use host-installed tools)
-./scripts/ralph/ralph.sh --host-mode [max_iterations]
+docker build \
+  --build-arg PROXY_CERT_URL=http://pki.example.com/proxy.cer \
+  --build-arg ISSUING_CA_CERT_URL=http://pki.example.com/IssuingCA.pem.cer \
+  --build-arg ROOT_CA_CERT_URL=http://pki.example.com/RootCA.pem.cer \
+  -f ralph-specs/resources/Dockerfile.template .
 ```
 
-Default is 30 iterations. Use `--tool amp` or `--tool claude` to override the default OpenCode tool. Use `--host-mode` when tools are installed locally and you want to skip container overhead.
+### Feedback loops
 
-Ralph will:
-1. Create a feature branch (from PRD `branchName`)
-2. Build the instruction prompt once (instructions + language-specific rules)
-3. Pick the next task where `passes: false` based on dependency/implementation flow
-4. Inject the selected task JSON and recent progress into the prompt
-5. Implement that single task
-6. Run quality checks (in containers by default, or on host with `--host-mode`)
-7. Commit if checks pass
-8. Update `.ralph/tasks.json` to mark the task as `passes: true`
-9. Append learnings to `.ralph/progress.md`
-10. Repeat until all tasks pass or max iterations reached
+Ralph relies on automated feedback:
+- Typecheck catches type errors
+- Tests verify behavior
+- CI must stay green (broken code compounds across iterations)
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | The bash loop that spawns fresh AI instances (supports `--tool opencode|amp|claude`, default OpenCode) |
-| `ralph-specs/prompt.md` | Prompt template for the AI tool |
-| `.ralph/tasks.json` | PRD-backed tasks with `passes` status (the task list) |
-| `.ralph/progress.md` | Append-only learnings for future iterations |
-| `tasks.json.example` | Example PRD format for reference |
-| `.ralph/suggested_improvements.md` | Suggestions to improve the Ralph runner/prompts/process (lives in the target repo; do not write inside the runner) |
-| `scripts/notify.sh` | Pushover notification helper (requires `PUSHOVER_TOKEN` and `PUSHOVER_USER_KEY` env vars) |
-| `skills/prd/` | Skill for generating PRDs (works with Amp and Claude Code) |
-| `skills/ralph_prd/` | Skill for converting PRDs to JSON (works with Amp and Claude Code) |
+| `ralph.sh` | Main loop — spawns fresh AI instances per iteration |
+| `ralph-specs/prompt.md` | Prompt template injected each iteration |
+| `ralph-specs/AGENTS.md` | Agent identity (thin pointer to prompt.md) |
+| `ralph-specs/ROLES.md` | Role definitions used during PRD creation |
+| `ralph-specs/code_generation_rules/` | Language-specific rules (auto-detected) |
+| `ralph-specs/resources/` | Dockerfiles and nuget.config templates |
+| `tasks.json.example` | Example tasks.json format |
+| `scripts/install_ralph_skills.sh` | Installs skills to OpenCode/Amp/Claude |
+| `scripts/notify.sh` | Pushover notification helper |
+| `scripts/check_prd.sh` | Validates tasks.json structure and dependencies |
+| `skills/prd/` | PRD generation skill |
+| `skills/ralph_runner/` | Ralph runner skill |
+
+### Target repo files (created by Ralph)
+
+| File | Purpose |
+|------|---------|
+| `.ralph/tasks.json` | Tasks with `passes` status |
+| `.ralph/progress.md` | Append-only iteration log |
+| `.ralph/suggested_improvements.md` | Process improvement suggestions |
+| `.ralph/prds/` | Archived PRD documents |
 
 ## Documentation Dependency Map
 
 ```mermaid
 graph LR
-  README[README.md]
   RALPH_SH[ralph.sh]
-  AGENTS[ralph-specs/AGENTS.md<br/>thin pointer]
+  AGENTS[ralph-specs/AGENTS.md]
   PROMPT[ralph-specs/prompt.md<br/>primary directive]
-  RULES_MD[ralph-specs/code_generation_rules/RULES.md]
-  RULES_DOTNET[ralph-specs/code_generation_rules/RULES-dotnet.md]
-  RULES_PY[ralph-specs/code_generation_rules/RULES-python.md]
+  RULES_MD[RULES.md]
+  RULES_DOTNET[RULES-dotnet.md]
+  RULES_PY[RULES-python.md]
   ROLES[ralph-specs/ROLES.md]
 
-  README --> RALPH_SH
   RALPH_SH -->|builds static prompt| PROMPT
   RALPH_SH -->|includes| AGENTS
   RALPH_SH -->|detects language & includes| RULES_MD
@@ -197,90 +272,36 @@ graph LR
   PROMPT -.->|referenced during PRD| ROLES
 ```
 
-## Critical Concepts
-
-### Each Iteration = Fresh Context
-
-Each iteration spawns a **new AI instance** (OpenCode/Amp/Claude Code) with clean context. The only memory between iterations is:
-- Git history (commits from previous iterations)
-- `progress.md` (learnings and context)
-- `tasks.json` (which stories are done)
-
-### Small Tasks
-
-Each PRD item should be small enough to complete in one context window. If a task is too big, the LLM runs out of context before finishing and produces poor code.
-
-Right-sized stories:
-- Add a database column and migration
-- Add a UI component to an existing page
-- Update a server action with new logic
-- Add a filter dropdown to a list
-
-Too big (split these):
-- "Build the entire dashboard"
-- "Add authentication"
-- "Refactor the API"
-
-### Codebase Pattern Analysis (keyFiles & implementationNotes)
-
-During PRD creation, the **Codebase Pattern Analyst** role (Role 5) reads the target codebase and populates two optional fields on each task in `tasks.json`:
-
-- **`keyFiles`** — array of file paths relevant to the task (files to read, create, or modify). New files include a `(create new)` suffix. These are hints, not guarantees; paths may shift between PRD creation and execution.
-- **`implementationNotes`** — concise guidance on how to implement: which patterns to follow, reference implementations, naming conventions, and test file locations.
-
-These fields let iteration agents skip the file discovery phase and start implementing immediately. When present, the agent reads `keyFiles` first and follows `implementationNotes` before doing any broad codebase scans.
-
-### AGENTS.md Updates Are Critical
-
-After each iteration, Ralph updates the relevant `AGENTS.md` files with learnings. This is key because AI coding tools automatically read these files, so future iterations (and future human developers) benefit from discovered patterns, gotchas, and conventions.
-
-Examples of what to add to AGENTS.md:
-- Patterns discovered ("this codebase uses X for Y")
-- Gotchas ("do not forget to update Z when changing W")
-- Useful context ("the settings panel is in component X")
-
-### Feedback Loops
-
-Ralph only works if there are feedback loops:
-- Typecheck catches type errors
-- Tests verify behavior
-- CI must stay green (broken code compounds across iterations)
-
-### Browser Verification for UI Stories
-
-Frontend stories must include "Verify in browser using dev-browser skill" in acceptance criteria. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
-
-### Stop Condition
-
-When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
-
 ## Debugging
 
-Check current state:
-
 ```bash
-# See which stories are done
-cat .ralph/tasks.json | jq '.tasks[] | {id, title, passes}'
+# See which tasks are done
+jq '.tasks[] | {id, title, passes}' .ralph/tasks.json
 
-# See learnings from previous iterations
-cat progress.md
+# See progress log
+cat .ralph/progress.md
 
 # Check git history
 git log --oneline -10
 ```
 
-## Customizing the Prompt
+## Notifications (Optional)
 
-After copying `ralph-specs/prompt.md` to your project, customize it for your project:
-- Add project-specific quality check commands
-- Include codebase conventions
-- Add common gotchas for your stack
+Ralph can send [Pushover](https://pushover.net) notifications when the loop terminates or when PRD generation completes.
+
+```bash
+export PUSHOVER_TOKEN="your-pushover-app-token"
+export PUSHOVER_USER_KEY="your-pushover-user-key"
+```
+
+Optional: `PUSHOVER_DEVICE` (target device) and `PUSHOVER_SOUND` (notification sound). Notifications are silently skipped if the variables are not set.
 
 ## Archiving
 
-Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
+Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-prd-NNNN-feature-name/`.
 
 ## References
 
+- [OpenCode documentation](https://opencode.ai/docs)
 - [Amp documentation](https://ampcode.com/manual)
 - [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
