@@ -97,7 +97,7 @@ test project that verifies the greeting output. The app and tests should
 be runnable via docker compose (include a docker-compose.yml and Dockerfile).
 ```
 
-The installed PRD skill triggers automatically. Answer the clarifying questions. When done, the skill produces `.ralph/tasks.json` with ordered, self-contained tasks. Review them, then exit OpenCode.
+The installed PRD skill triggers automatically. Answer the clarifying questions. When done, the skill produces `.ralph/tasks.json` with ordered, self-contained tasks. Review them, then exit OpenCode. To browse the generated files, open VS Code with `code .`.
 
 Or use the CLI one-liner:
 
@@ -126,9 +126,6 @@ docker compose run --rm app
 
 # Run the tests
 docker compose run --rm test
-
-# Open in VS Code to browse the generated files
-code .
 ```
 
 ## Prerequisites
