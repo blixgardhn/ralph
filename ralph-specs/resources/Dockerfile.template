@@ -1,20 +1,27 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
+# To use corporate CA certificates behind a proxy, set these build args:
+#   --build-arg PROXY_CERT_URL=http://pki.example.com/proxy.cer
+#   --build-arg ISSUING_CA_CERT_URL=http://pki.example.com/IssuingCA.pem.cer
+#   --build-arg ROOT_CA_CERT_URL=http://pki.example.com/RootCA.pem.cer
+# Leave unset to skip certificate installation.
+ARG PROXY_CERT_URL=""
+ARG ISSUING_CA_CERT_URL=""
+ARG ROOT_CA_CERT_URL=""
+
 RUN set -e; \
     apt-get update; \
     apt-get install -y --no-install-recommends bash curl ca-certificates git; \
-    echo "Installing proxy certificate for internal build..."; \
-    echo "***********************************************"; \
-    cd /usr/local/share/ca-certificates; \
-    curl -O "http://pki.example.com/proxy/proxy.cer"; \
-    curl -O "http://pki.example.com/chain/IssuingCA.pem.cer"; \
-    curl -O "http://pki.example.com/chain/RootCA.pem.cer"; \
-    mv proxy.cer proxy.crt; \
-    mv "IssuingCA.pem.cer" "IssuingCA.pem.crt"; \
-    mv RootCA.pem.cer RootCA.pem.crt; \
-    update-ca-certificates; \
-    echo "=== Proxy certificate installed successfully ==="; \
+    if [ -n "$PROXY_CERT_URL" ]; then \
+      echo "Installing proxy/CA certificates..."; \
+      cd /usr/local/share/ca-certificates; \
+      curl -O "$PROXY_CERT_URL" && mv "$(basename "$PROXY_CERT_URL")" proxy.crt; \
+      [ -n "$ISSUING_CA_CERT_URL" ] && curl -O "$ISSUING_CA_CERT_URL" && mv "$(basename "$ISSUING_CA_CERT_URL")" issuing-ca.crt || true; \
+      [ -n "$ROOT_CA_CERT_URL" ] && curl -O "$ROOT_CA_CERT_URL" && mv "$(basename "$ROOT_CA_CERT_URL")" root-ca.crt || true; \
+      update-ca-certificates; \
+      echo "=== CA certificates installed ==="; \
+    fi; \
     rm -rf /var/lib/apt/lists/*; \
     curl -fsSL https://opencode.ai/install | bash; \
     useradd -m -d /home/opencode opencode; \

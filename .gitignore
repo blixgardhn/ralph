@@ -13,5 +13,19 @@ progress.txt
 # OS files
 .DS_Store
 
-#Claude
+# Claude
 .claude/
+
+# Secrets and credentials
+.env*
+*.pem
+*.key
+*.cer
+*.crt
+*.p12
+*.pfx
+credentials*
+*secret*
+
+# Personal scripts
+scripts/setup_github_dual_accounts.sh
