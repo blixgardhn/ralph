@@ -31,7 +31,7 @@ Verify with `docker compose version`.
 curl -fsSL https://opencode.ai/install | bash
 ```
 
-Verify with `opencode --version`. A [GitHub Copilot](https://github.com/features/copilot) subscription is required — once set up, models are available out of the box with no extra API keys. You also need `jq` and `git`:
+Verify with `opencode --version`. OpenCode includes free models by default. Optionally, link a [GitHub Copilot](https://github.com/features/copilot) subscription for access to additional models. You also need `jq` and `git`:
 
 ```bash
 sudo apt install jq git
@@ -61,7 +61,6 @@ Create or edit `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "copilot/claude-sonnet-4",
   "permission": {
     "external_directory": {
       "/home/<your-user>/projects/**": "allow"
@@ -148,7 +147,7 @@ The minimal config is shown in the [Quick Start](#3-configure-opencode-permissio
     "/path/to/your/projects/**": "allow"
   }
   ```
-- **Model** — By default Ralph uses OpenCode's built-in default model. Override via a `.env` file in your project root (`OPENCODE_MODEL=copilot/claude-sonnet-4`), the `--opencode-model` flag, or the `OPENCODE_MODEL` env var.
+- **Model** — OpenCode includes free models out of the box; the default works without any configuration. If you have a GitHub Copilot subscription, you can use Copilot-hosted models by overriding via `.env` in your project root (e.g. `OPENCODE_MODEL=github-copilot/claude-opus-4.6`), the `--opencode-model` flag, or the `OPENCODE_MODEL` env var.
 - **Custom providers** — you can add providers (OpenAI, Ollama, etc.) under the `"provider"` key. Keep API keys out of this file if you plan to share your config; use environment variables instead.
 - **Duplicate JSON keys** — JSON parsers take the last value for duplicate keys. If you have per-path permission overrides, ensure they don't get silently overridden by a later blanket rule.
 
