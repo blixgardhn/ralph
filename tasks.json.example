@@ -20,7 +20,7 @@
         "src/models/task.ts",
         "tests/task-selector.test.ts (create new)"
       ],
-      "implementationNotes": "Follow the pattern in src/task-runner.ts for reading tasks.json. Use topological sort on dependsOn fields to determine order.",
+      "implementationNotes": "Use topological sort on dependsOn fields to determine order. Follow existing patterns in the codebase for reading tasks.json.",
       "passes": false,
       "notes": ""
     }
