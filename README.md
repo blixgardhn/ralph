@@ -6,6 +6,8 @@ Ralph is an autonomous AI agent loop that runs coding tools ([OpenCode](https://
 
 ## Quick Start
 
+This walkthrough creates a .NET console app from scratch using Ralph — from zero to working code in 5 minutes.
+
 ### 0. Prerequisites
 
 **WSL (Windows users):** Ralph runs in a Linux shell. If you're on Windows, install [WSL 2](https://learn.microsoft.com/en-us/windows/wsl/install) first and run everything below inside your WSL distro:
@@ -35,25 +37,28 @@ Verify with `opencode --version`. You also need `jq` and `git`:
 sudo apt install jq git
 ```
 
-### 1. Clone Ralph alongside your project
+### 1. Clone Ralph and set up a test project
 
 ```bash
-cd /path/to/your/projects    # parent dir where your repos live
+# Clone Ralph
+cd ~/projects
 git clone https://github.com/blixgardhn/ralph.git
-```
 
-### 2. Install skills
-
-```bash
+# Install skills
 cd ralph
 ./scripts/install_ralph_skills.sh
+
+# Create a hello-world .NET project (using a container — no .NET SDK needed on host)
+cd ~/projects
+mkdir hello-ralph && cd hello-ralph
+docker run --rm -v "$PWD":/app -w /app mcr.microsoft.com/dotnet/sdk:9.0 \
+  dotnet new console -n HelloRalph -o .
+git init && git add -A && git commit -m "Initial scaffold"
 ```
 
-This copies the PRD and runner skills into `~/.config/opencode/skills/`, `~/.config/amp/skills/`, and `~/.claude/skills/`.
+### 2. Configure OpenCode permissions
 
-### 3. Configure OpenCode permissions
-
-Ralph runs OpenCode in non-interactive piped mode. Without the right permissions, it will hang. Create or edit `~/.config/opencode/opencode.json`:
+Create or edit `~/.config/opencode/opencode.json`:
 
 ```json
 {
@@ -61,7 +66,7 @@ Ralph runs OpenCode in non-interactive piped mode. Without the right permissions
   "model": "github-copilot/gpt-5.1-codex-max",
   "permission": {
     "external_directory": {
-      "/path/to/your/projects/**": "allow"
+      "/home/<your-user>/projects/**": "allow"
     },
     "read": "allow",
     "list": "allow",
@@ -74,28 +79,53 @@ Ralph runs OpenCode in non-interactive piped mode. Without the right permissions
 }
 ```
 
-Set `external_directory` to the parent folder where your project repos live. All permissions must be `"allow"` — see [OpenCode Configuration](#opencode-configuration) for details.
+Replace `<your-user>` with your actual username. All permissions must be `"allow"` — see [OpenCode Configuration](#opencode-configuration) for details.
 
 If your org uses a TLS-intercepting proxy, private package feeds, or custom AI providers, see [Organization-specific settings](#organization-specific-settings).
 
-### 4. Create a PRD
+### 3. Create a PRD
 
-Open your AI coding tool (OpenCode, Amp, or Claude Code) in your **project repo** and run:
-
-```
-Load the prd skill and create a PRD for "your feature description"
-```
-
-Answer the clarifying questions. The skill produces `.ralph/tasks.json` with ordered, self-contained tasks ready for autonomous execution.
-
-### 5. Run Ralph
+Open OpenCode in your project and ask it to create a PRD:
 
 ```bash
-cd your-project
+cd ~/projects/hello-ralph
+opencode
+```
+
+Then type:
+
+```
+Load the prd skill and create a PRD for "Add a greeting feature to the
+HelloRalph console app: prompt the user for their name and print
+'Hello, <name>! Welcome to Ralph.' Add a unit test project with xUnit
+that verifies the greeting output."
+```
+
+Answer the clarifying questions. The skill produces `.ralph/tasks.json` with ordered tasks. Review the tasks, then exit OpenCode.
+
+### 4. Run Ralph
+
+```bash
+cd ~/projects/hello-ralph
 ../ralph/ralph.sh --target-repo .
 ```
 
-Ralph creates a feature branch, works through tasks one per iteration, and stops when all tasks pass. Monitor progress in the terminal or via Pushover notifications (see [Notifications](#notifications-optional)).
+Ralph creates a feature branch, works through each task (implement, build, test — all inside containers), and stops when all tasks pass. Watch the progress in the terminal.
+
+When it finishes, check the result:
+
+```bash
+# See what Ralph built
+git log --oneline
+
+# Run it
+docker run --rm -v "$PWD":/app -w /app mcr.microsoft.com/dotnet/sdk:9.0 \
+  dotnet run
+
+# Run the tests
+docker run --rm -v "$PWD":/app -w /app mcr.microsoft.com/dotnet/sdk:9.0 \
+  dotnet test
+```
 
 ## Prerequisites
 
