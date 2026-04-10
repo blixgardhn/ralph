@@ -689,28 +689,26 @@ run_iteration() {
     notify_and_exit 0 "Ralph: Stopped" "Agent requested stop at iteration $iteration of $MAX_ITERATIONS.\n<b>Iteration time:</b> $(format_duration "$elapsed")\n<b>Total time:</b> $(format_duration "$loop_elapsed")" 1
   fi
 
-  # Permission rejection — the agent was denied access to a tool or directory.
-  # This is unrecoverable without config changes; exit immediately with guidance.
-  if echo "$OUTPUT" | grep -q "permission requested:.*auto-rejecting\|The user rejected permission to use this"; then
+  # Unrecoverable error — the agent hit a fatal problem (permission denied,
+  # missing credentials, broken environment, etc.) and emitted ERROR.
+  if echo "$OUTPUT" | grep -q "<promise>ERROR</promise>"; then
     echo "" >&2
     echo "========================================" >&2
-    echo "FATAL: Permission rejected during iteration $iteration." >&2
-    echo "The agent was denied a required permission and cannot continue." >&2
-    echo "" >&2
-    echo "To fix:" >&2
-    echo "  1. Open ~/.config/opencode/opencode.json" >&2
-    echo "  2. Ensure ALL permissions are set to \"allow\"" >&2
-    echo "  3. Add your project path to external_directory:" >&2
-    echo "     \"external_directory\": { \"/path/to/your/projects/**\": \"allow\" }" >&2
-    echo "  4. Restart Ralph" >&2
+    echo "ERROR: Unrecoverable error at iteration $iteration." >&2
+    # Extract the agent's error description (text after the ERROR tag)
+    local error_msg
+    error_msg=$(echo "$OUTPUT" | sed -n '/<promise>ERROR<\/promise>/,$ { /<promise>ERROR<\/promise>/d; p; }' | head -20)
+    if [ -n "$error_msg" ]; then
+      echo "$error_msg" >&2
+    fi
     echo "========================================" >&2
-    record_suggestions "$iteration" "permission_error" "$OUTPUT"
+    record_suggestions "$iteration" "error" "$OUTPUT"
     local iter_end elapsed loop_elapsed
     iter_end=$(date +%s)
     elapsed=$((iter_end - iter_start))
     loop_elapsed=$((iter_end - LOOP_START_SECS))
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
-    notify_and_exit 1 "Ralph: Permission Error" "Agent was denied a required permission at iteration $iteration. Check opencode.json permissions." 1
+    notify_and_exit 1 "Ralph: Error" "Unrecoverable error at iteration $iteration. Check output for details." 1
   fi
 
   record_suggestions "$iteration" "continued" "$OUTPUT"

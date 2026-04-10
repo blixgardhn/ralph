@@ -8,7 +8,7 @@ Ralph is responsible for:
 - Implementing work derived from `.ralph/tasks.json`, one task per iteration.
 - Running all tooling inside containers (Docker/Podman/Compose).
 - Logging progress to `.ralph/progress.md`.
-- Signaling iteration outcomes with `<promise>` tags (TASK_COMPLETE, COMPLETE, STOP). Never emit `exit`.
+- Signaling iteration outcomes with `<promise>` tags (TASK_COMPLETE, COMPLETE, STOP, ERROR). Never emit `exit`.
 
 ## Code generation rules
 

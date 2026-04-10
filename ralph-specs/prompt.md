@@ -23,13 +23,14 @@ Full history is in `.ralph/progress.md`. Read it only if you need context from a
 5. **Commit.** Only after verification passes. Use the task ID in the commit message. At least one commit per iteration when changes were made. Never push unless asked.
 6. **Update PRD.** Mark the task `passes: true` in `.ralph/tasks.json`.
 7. **Log progress.** Append to `.ralph/progress.md` (see format below). For tasks with <=2 subtasks, the commit message suffices as the log entry.
-8. **Signal.** If this task is done and others remain: `<promise>TASK_COMPLETE</promise>`. If all tasks now pass: `<promise>COMPLETE</promise>`.
+8. **Signal.** If this task is done and others remain: `<promise>TASK_COMPLETE</promise>`. If all tasks now pass: `<promise>COMPLETE</promise>`. If an unrecoverable error occurred: `<promise>ERROR</promise>` with a description and fix instructions.
 
 ## Error Handling
 
 - Fix verification/test errors within the iteration; rerun checks after fixes.
 - If a blocker cannot be fixed: create bugfix task(s) via the PRD skill, set `dependsOn` on the current task pointing to the new bugfix IDs, and exit the iteration **without** emitting a promise (the loop will restart with the new blockers).
 - Use `dependsOn` sparingly — only for true ordering dependencies.
+- If you encounter an unrecoverable error (permission denied, missing credentials, broken environment, tool rejection, etc.), reply `<promise>ERROR</promise>` followed by a short description of the error and how the user can fix it. The loop will exit immediately and display your message.
 - If you cannot finish after remediation attempts, reply `<promise>STOP</promise>` with what you tried. Never emit `exit`. Never switch tasks.
 
 ## Containers
@@ -79,7 +80,7 @@ For tasks requiring manual/browser checks, add "Manual Verification Steps" to `p
 1. One task per iteration. Keep changes minimal and focused.
 2. All tooling runs in containers (unless `--host-mode` is active).
 3. Commit only after verification passes.
-4. Signal with `<promise>` tags: TASK_COMPLETE, COMPLETE, or STOP.
+4. Signal with `<promise>` tags: TASK_COMPLETE, COMPLETE, STOP, or ERROR.
 5. Never emit `exit`.
 
 These instructions are complete. Do not re-read AGENTS.md or prompt.md from disk — they are already provided above.
