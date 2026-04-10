@@ -61,7 +61,7 @@ Create or edit `~/.config/opencode/opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "github-copilot/gpt-5.1-codex-max",
+  "model": "copilot/claude-sonnet-4",
   "permission": {
     "external_directory": {
       "/home/<your-user>/projects/**": "allow"
@@ -148,7 +148,7 @@ The minimal config is shown in the [Quick Start](#3-configure-opencode-permissio
     "/path/to/your/projects/**": "allow"
   }
   ```
-- **Model** — Ralph defaults to `github-copilot/gpt-5.1-codex-max`. Override with `--opencode-model <model>` or the `OPENCODE_MODEL` env var.
+- **Model** — By default Ralph uses OpenCode's built-in default model. Override via a `.env` file in your project root (`OPENCODE_MODEL=copilot/claude-sonnet-4`), the `--opencode-model` flag, or the `OPENCODE_MODEL` env var.
 - **Custom providers** — you can add providers (OpenAI, Ollama, etc.) under the `"provider"` key. Keep API keys out of this file if you plan to share your config; use environment variables instead.
 - **Duplicate JSON keys** — JSON parsers take the last value for duplicate keys. If you have per-path permission overrides, ensure they don't get silently overridden by a later blanket rule.
 
@@ -227,7 +227,7 @@ The PRD skill runs 8 specialized roles (clarification, scope, feasibility, codeb
 | `--tool` | `opencode` | AI tool to use (`opencode`, `amp`, `claude`) |
 | `--target-repo` | current directory | Path to the project repository |
 | `--host-mode` | off | Skip container wrapping; run builds/tests directly on host |
-| `--opencode-model` | `github-copilot/gpt-5.1-codex-max` | Override the OpenCode model |
+| `--opencode-model` | OpenCode default | Override the OpenCode model (or set `OPENCODE_MODEL` in `.env`) |
 | `[max_iterations]` | `30` | Maximum number of iterations |
 
 ### What Ralph does each iteration

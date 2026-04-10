@@ -8,7 +8,7 @@ set -euo pipefail
 TOOL="opencode"
 MAX_ITERATIONS=30
 HOST_MODE=false
-OPENCODE_MODEL="${OPENCODE_MODEL:-github-copilot/gpt-5.1-codex-max}"
+OPENCODE_MODEL="${OPENCODE_MODEL:-}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 export RALPH_ROOT
 TARGET_REPO_ROOT="" # target repo root where code will be generated
@@ -651,7 +651,11 @@ run_iteration() {
   elif [[ "$TOOL" == "claude" ]]; then
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | claude --dangerously-skip-permissions --print 2>&1 | tee >(cat >&2)) || true
   else
-    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | opencode run --model "$OPENCODE_MODEL" 2>&1 | tee >(cat >&2)) || true
+    local model_flag=""
+    if [[ -n "$OPENCODE_MODEL" ]]; then
+      model_flag="--model $OPENCODE_MODEL"
+    fi
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | opencode run $model_flag 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
@@ -737,6 +741,14 @@ main() {
   parse_args "$@"
   validate_tool
   set_paths
+  # Load .env from target repo if present (allows OPENCODE_MODEL override etc.)
+  if [ -f "$TARGET_REPO_ROOT/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$TARGET_REPO_ROOT/.env"
+    set +a
+    echo "[Ralph] Loaded .env from $TARGET_REPO_ROOT/.env" >&2
+  fi
   require_runner_specs_dir || true
   require_agents_file || true
   require_prompt_file || true

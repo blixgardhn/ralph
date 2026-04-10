@@ -20,7 +20,7 @@ When invoked from a target repository that sits alongside this runner, call it a
 - `--tool`: Agent tool to use (`opencode`, `amp`, or `claude`). Default: `opencode`.
 - `--host-mode`: Skip container wrapping; run tools, tests, and builds directly on the host. Default: off (containers required).
 - `--target-repo`: Path to the target repository. Default: current working directory.
-- `--opencode-model`: Override the OpenCode model. Default: `github-copilot/gpt-5.1-codex-max`.
+- `--opencode-model`: Override the OpenCode model. Default: OpenCode's built-in default (configurable via `.env`).
 
 ### Patterns
 - Use the smallest base image matching the stack under test; avoid heavy images.

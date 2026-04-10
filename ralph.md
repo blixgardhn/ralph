@@ -4,7 +4,7 @@ High-level guide to the Ralph loop runner script used to orchestrate autonomous 
 
 ## Overview
 - Launches repeated AI-driven coding iterations using a prompt template and PRD-derived tasks.
-- Supports tools `opencode` (default), `amp`, and `claude`; OpenCode model defaults to `github-copilot/gpt-5.1-codex-max`.
+- Supports tools `opencode` (default), `amp`, and `claude`; OpenCode model is configurable via `.env`, `--opencode-model`, or `OPENCODE_MODEL` env var (defaults to OpenCode's built-in model).
 - Enforces that work happens on a feature branch defined in `.ralph/tasks.json` (`branchName`); refuses to run on main/master or inside the runner repo itself.
 - Archives PRDs when they change, initializes progress/suggestions files, and validates PRD structure before running.
 - Builds the instruction prompt once at loop start; per-iteration, only the selected task JSON and recent progress are injected.
