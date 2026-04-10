@@ -6,37 +6,34 @@ Ralph is an autonomous AI agent loop that runs coding tools ([OpenCode](https://
 
 ## Quick Start
 
-```bash
-# 1. Create a PRD (interactive — run inside your AI coding tool)
-#    Load the prd skill and create a PRD for "your feature description"
+### 1. Clone Ralph alongside your project
 
-# 2. Run Ralph against your project
-../ralph/ralph.sh --target-repo /path/to/your/project
+```bash
+cd /path/to/your/projects    # parent dir where your repos live
+git clone https://github.com/blixgardhn/ralph.git
 ```
 
-Ralph reads tasks from `.ralph/tasks.json` in the target repo and works through them one per iteration until all pass.
+### 2. Install skills
 
-## Prerequisites
+```bash
+cd ralph
+./scripts/install_ralph_skills.sh
+```
 
-- **AI coding tool** (one of):
-  - [OpenCode CLI](https://opencode.ai) (default)
-  - [Amp CLI](https://ampcode.com)
-  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- **Docker or Podman** with Compose support (all builds/tests/installs run in containers)
-- **jq** (`apt install jq` or `brew install jq`)
-- A git repository for your project
+This copies the PRD and runner skills into `~/.config/opencode/skills/`, `~/.config/amp/skills/`, and `~/.claude/skills/`.
 
-## OpenCode Configuration
+### 3. Configure OpenCode permissions
 
-Ralph invokes OpenCode in non-interactive piped mode (`opencode run --model <model>`). For this to work without manual approval prompts, your OpenCode config must grant all tool permissions.
-
-Create or edit `~/.config/opencode/opencode.json`:
+Ralph runs OpenCode in non-interactive piped mode. Without the right permissions, it will hang. Create or edit `~/.config/opencode/opencode.json`:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "github-copilot/gpt-5.1-codex-max",
   "permission": {
+    "external_directory": {
+      "/path/to/your/projects/**": "allow"
+    },
     "read": "allow",
     "list": "allow",
     "glob": "allow",
@@ -48,7 +45,39 @@ Create or edit `~/.config/opencode/opencode.json`:
 }
 ```
 
-### Key points
+Set `external_directory` to the parent folder where your project repos live. All permissions must be `"allow"` — see [OpenCode Configuration](#opencode-configuration) for details.
+
+If your org uses a TLS-intercepting proxy, private package feeds, or custom AI providers, see [Organization-specific settings](#organization-specific-settings).
+
+### 4. Create a PRD
+
+Open your AI coding tool (OpenCode, Amp, or Claude Code) in your **project repo** and run:
+
+```
+Load the prd skill and create a PRD for "your feature description"
+```
+
+Answer the clarifying questions. The skill produces `.ralph/tasks.json` with ordered, self-contained tasks ready for autonomous execution.
+
+### 5. Run Ralph
+
+```bash
+cd your-project
+../ralph/ralph.sh --target-repo .
+```
+
+Ralph creates a feature branch, works through tasks one per iteration, and stops when all tasks pass. Monitor progress in the terminal or via Pushover notifications (see [Notifications](#notifications-optional)).
+
+## Prerequisites
+
+- [OpenCode CLI](https://opencode.ai) (default), [Amp CLI](https://ampcode.com), or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+- Docker or Podman with Compose support
+- `jq` (`apt install jq` or `brew install jq`)
+- A git repository for your project
+
+## OpenCode Configuration
+
+The minimal config is shown in the [Quick Start](#3-configure-opencode-permissions). Additional details:
 
 - **All tool permissions must be `"allow"`.** If any permission is missing or set to `"deny"`, the agent will hang waiting for interactive approval that never comes in piped mode.
 - **`external_directory`** — if your target repo is outside OpenCode's default working directory, add it here:
@@ -71,38 +100,17 @@ Create or edit `~/.config/opencode/opencode.json`:
 
 OpenCode is the only tool where permissions are configured externally rather than via a CLI flag. If Ralph hangs during an iteration with no output, check your permissions config first.
 
-## Setup
+## Setup Details
 
-### Option 1: Clone alongside your project (recommended)
-
-```bash
-# Clone Ralph next to your project
-cd /path/to/your/projects
-git clone https://github.com/blixgardhn/ralph.git
-
-# Run against your project
-cd your-project
-../ralph/ralph.sh --target-repo .
-```
+The [Quick Start](#quick-start) covers the recommended setup (clone alongside + install skills). Additional notes:
 
 Ralph resolves two path roots on startup:
 - `RALPH_ROOT` — the Ralph checkout (instructions, prompts, rules, resources). Nothing is written here at runtime.
 - `TARGET_REPO_ROOT` — your project repo. All artifacts (`.ralph/tasks.json`, `.ralph/progress.md`, commits) are written here.
 
-### Option 2: Install skills globally
+### Manual skill installation
 
-Use the installer to copy skills to all supported tools:
-
-```bash
-./scripts/install_ralph_skills.sh
-```
-
-This installs to:
-- OpenCode: `~/.config/opencode/skills/`
-- Amp: `~/.config/amp/skills/`
-- Claude Code: `~/.claude/skills/`
-
-Or copy manually for a single tool:
+If you prefer to install skills for a single tool instead of using the installer:
 
 ```bash
 # OpenCode
@@ -118,9 +126,9 @@ cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph_runner ~/.claude/skills/
 ```
 
-## Workflow
+## Workflow Details
 
-### 1. Create a PRD
+### Creating a PRD
 
 Inside your AI coding tool, load the PRD skill:
 
@@ -134,7 +142,7 @@ Answer the clarifying questions. The skill produces:
 
 The PRD skill runs 8 specialized roles (clarification, scope, feasibility, codebase analysis, quality review, domain validation, and formatting) to produce well-ordered, self-contained tasks.
 
-### 2. Run Ralph
+### Running Ralph
 
 ```bash
 # OpenCode (default)
