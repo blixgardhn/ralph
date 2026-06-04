@@ -43,6 +43,49 @@ All installs, tests, builds, and seeding run in containers. Never install toolch
 - Prefer prebuilt images; avoid pull/build delays.
 {{HOST_MODE_NOTE}}
 
+### Corporate proxy / CA certificates
+
+If the environment variables `PROXY_CERT_URL`, `ISSUING_CA_CERT_URL`, or `ROOT_CA_CERT_URL` are set, any Dockerfile you create must include the cert-install block so containers can reach external registries and APIs through the corporate proxy:
+
+```dockerfile
+ARG PROXY_CERT_URL=""
+ARG ISSUING_CA_CERT_URL=""
+ARG ROOT_CA_CERT_URL=""
+
+RUN set -e; \
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    if [ -n "$PROXY_CERT_URL" ]; then \
+      cd /usr/local/share/ca-certificates; \
+      curl -O "$PROXY_CERT_URL" && mv "$(basename "$PROXY_CERT_URL")" proxy.crt; \
+      [ -n "$ISSUING_CA_CERT_URL" ] && curl -O "$ISSUING_CA_CERT_URL" && mv "$(basename "$ISSUING_CA_CERT_URL")" issuing-ca.crt || true; \
+      [ -n "$ROOT_CA_CERT_URL" ] && curl -O "$ROOT_CA_CERT_URL" && mv "$(basename "$ROOT_CA_CERT_URL")" root-ca.crt || true; \
+      update-ca-certificates; \
+    fi && \
+    rm -rf /var/lib/apt/lists/*
+```
+
+Pass the same args when building:
+
+```bash
+docker build \
+  --build-arg PROXY_CERT_URL="$PROXY_CERT_URL" \
+  --build-arg ISSUING_CA_CERT_URL="$ISSUING_CA_CERT_URL" \
+  --build-arg ROOT_CA_CERT_URL="$ROOT_CA_CERT_URL" \
+  ...
+```
+
+Or in `docker-compose.yml`:
+
+```yaml
+build:
+  args:
+    PROXY_CERT_URL: ${PROXY_CERT_URL:-}
+    ISSUING_CA_CERT_URL: ${ISSUING_CA_CERT_URL:-}
+    ROOT_CA_CERT_URL: ${ROOT_CA_CERT_URL:-}
+```
+
+If the env vars are not set, the block is a no-op and the Dockerfile works in any environment.
+
 ## Branching
 
 - One feature branch per PRD: `ralph/prd-<PRD_ID>`. Never commit to main/master.
