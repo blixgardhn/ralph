@@ -19,10 +19,37 @@ See `RULES.md` for shared guidance (language, development style, safety, observa
 - Reusable code may be placed in library projects within the solution.
 
 ### Restore/build prerequisites
-- `dotnet restore`/`dotnet build` require the repo-root `ralph/nuget.config`; without it the private feed is unreachable and builds will fail.
-- Ensure the sources in `nuget.config` are available during restore (e.g., mount the file and pass through network access in containers/CI) or the restore will fail.
-- The private feed credentials come from the host `NUGET_API_KEY`; ensure it is available to the `dotnet` command (export locally or pass through to containers/tooling).
-- Do not commit credentials or edit `nuget.config` values—only supply the key via environment variables.
+
+A private NuGet feed is used when `NUGET_PRIVATE_FEED_URL` is set in the environment. All `dotnet restore` and `dotnet build` commands must mount `nuget.config` and pass the feed credentials.
+
+**Concrete docker run pattern:**
+
+```bash
+docker run --rm \
+  -v "$PWD":/work \
+  -v "$RALPH_ROOT/ralph-specs/resources/nuget.config":/work/nuget.config:ro \
+  -e NUGET_PRIVATE_FEED_URL="$NUGET_PRIVATE_FEED_URL" \
+  -e NUGET_API_KEY="$NUGET_API_KEY" \
+  -w /work \
+  mcr.microsoft.com/dotnet/sdk:9.0 \
+  dotnet build
+```
+
+**Concrete docker compose pattern** — add to the service in `docker-compose.yml`:
+
+```yaml
+volumes:
+  - ${RALPH_ROOT}/ralph-specs/resources/nuget.config:/app/nuget.config:ro
+environment:
+  NUGET_PRIVATE_FEED_URL: ${NUGET_PRIVATE_FEED_URL:-}
+  NUGET_API_KEY: ${NUGET_API_KEY:-}
+```
+
+Rules:
+- Always mount `nuget.config` from `$RALPH_ROOT/ralph-specs/resources/nuget.config` — do not copy or commit it into the target repo.
+- Always forward `NUGET_PRIVATE_FEED_URL` and `NUGET_API_KEY` — they come from the host environment (set in the target repo's `.env`).
+- If `NUGET_PRIVATE_FEED_URL` is empty the private feed entry in `nuget.config` is a no-op; builds still work against nuget.org.
+- Do not commit credentials or hardcode feed URLs.
 ### ASP.NET Core architecture (guidelines, not dogma)
 - Use ASP.NET Core MVC conventions to organize functionality (Controllers, Views, Models).
 - Prefer clear domain models over generic key/value blobs.

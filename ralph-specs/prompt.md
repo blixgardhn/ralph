@@ -38,7 +38,7 @@ Full history is in `.ralph/progress.md`. Read it only if you need context from a
 All installs, tests, builds, and seeding run in containers. Never install toolchains on the host.
 - Pattern: `docker run --rm -v "$PWD":/work -w /work <image> <cmd>`
 - Images: `node:20`, `python:3.11`, `mcr.microsoft.com/dotnet/sdk`, or project-specific.
-- .NET: mount `nuget.config` and pass `NUGET_API_KEY` when required.
+- .NET: mount `$RALPH_ROOT/ralph-specs/resources/nuget.config` into the container and forward `NUGET_PRIVATE_FEED_URL` and `NUGET_API_KEY` env vars. See `.NET` rules for the exact pattern.
 - Prefer `docker compose run <svc> <cmd>` when a compose file exists.
 - Prefer prebuilt images; avoid pull/build delays.
 {{HOST_MODE_NOTE}}
