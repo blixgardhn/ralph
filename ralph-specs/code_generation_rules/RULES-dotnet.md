@@ -29,7 +29,7 @@ docker run --rm \
   -v "$PWD":/work \
   -v "$RALPH_ROOT/ralph-specs/resources/nuget.config":/work/nuget.config:ro \
   -e NUGET_PRIVATE_FEED_URL="$NUGET_PRIVATE_FEED_URL" \
-  -e NUGET_API_KEY="$NUGET_API_KEY" \
+  -e PROGET_DOTNET_TOKEN="$PROGET_DOTNET_TOKEN" \
   -w /work \
   mcr.microsoft.com/dotnet/sdk:9.0 \
   dotnet build
@@ -42,12 +42,12 @@ volumes:
   - ${RALPH_ROOT}/ralph-specs/resources/nuget.config:/app/nuget.config:ro
 environment:
   NUGET_PRIVATE_FEED_URL: ${NUGET_PRIVATE_FEED_URL:-}
-  NUGET_API_KEY: ${NUGET_API_KEY:-}
+  PROGET_DOTNET_TOKEN: ${PROGET_DOTNET_TOKEN:-}
 ```
 
 Rules:
 - Always mount `nuget.config` from `$RALPH_ROOT/ralph-specs/resources/nuget.config` — do not copy or commit it into the target repo.
-- Always forward `NUGET_PRIVATE_FEED_URL` and `NUGET_API_KEY` — they come from the host environment (set in the target repo's `.env`).
+- Always forward `NUGET_PRIVATE_FEED_URL` and `PROGET_DOTNET_TOKEN` — they come from the host environment (set in the target repo's `.env`).
 - If `NUGET_PRIVATE_FEED_URL` is empty the private feed entry in `nuget.config` is a no-op; builds still work against nuget.org.
 - Do not commit credentials or hardcode feed URLs.
 ### ASP.NET Core architecture (guidelines, not dogma)

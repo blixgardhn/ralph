@@ -293,11 +293,11 @@ If you're running Ralph inside a corporate environment, you may need to configur
 
 **Container CA certificates** — If your network uses a TLS-intercepting proxy or internal PKI, containers won't be able to reach package registries or external APIs without the CA certs. Pass them via the Dockerfile build args shown above.
 
-**Private NuGet feeds (.NET)** — Edit `ralph-specs/resources/nuget.config` and set the `NUGET_PRIVATE_FEED_URL` and `NUGET_API_KEY` environment variables:
+**Private NuGet feeds (.NET)** — Edit `ralph-specs/resources/nuget.config` and set the `NUGET_PRIVATE_FEED_URL` and `PROGET_DOTNET_TOKEN` environment variables:
 
 ```bash
 export NUGET_PRIVATE_FEED_URL="https://your-org.example.com/nuget/v3/index.json"
-export NUGET_API_KEY="your-api-key"
+export PROGET_DOTNET_TOKEN="your-api-key"
 ```
 
 **HTTP/HTTPS proxy** — If containers need a proxy for outbound access, pass standard proxy env vars when running containers:
