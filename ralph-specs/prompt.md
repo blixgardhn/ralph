@@ -43,12 +43,16 @@ All installs, tests, builds, and seeding run in containers. Never install toolch
 - Prefer prebuilt images; avoid pull/build delays.
 {{HOST_MODE_NOTE}}
 
-### Corporate proxy / CA certificates
+### Corporate proxy / CA certificates — ALWAYS REQUIRED
 
-If the environment variables `PROXY_CERT_URL`, `ISSUING_CA_CERT_URL`, or `ROOT_CA_CERT_URL` are set, any Dockerfile in the **current target project** must include the cert-install block so containers can reach external registries and APIs through the corporate proxy. This applies to:
+**Every Dockerfile in the target project must include the cert-install block. Every container build must pass the cert build args. No exceptions.** This is non-negotiable — skipping it costs an entire rebuild cycle when the container can't reach NuGet, npm, apt, or external APIs.
 
-- Dockerfiles you create as part of an iteration.
-- **Existing Dockerfiles in the target project** — retrofit them to add the cert-install ARG/RUN block if missing. Do not touch Dockerfiles in other repos or in `$RALPH_ROOT`.
+This applies to:
+
+- Dockerfiles you create as part of an iteration — include the block from the start.
+- **Existing Dockerfiles in the target project** — retrofit them with the cert-install ARG/RUN block if missing. Do not touch Dockerfiles in other repos or in `$RALPH_ROOT`.
+
+The block is safe in any environment: if the cert URL env vars are empty, the `if [ -n "$PROXY_CERT_URL" ]` guard skips installation and the build works on machines without a corporate proxy. There is no downside to including it.
 
 ```dockerfile
 ARG PROXY_CERT_URL=""
@@ -67,17 +71,15 @@ RUN set -e; \
     rm -rf /var/lib/apt/lists/*
 ```
 
-Pass the same args when building:
+**Always pass the build args** — both for ad-hoc `docker build` and via `docker-compose.yml`:
 
 ```bash
 docker build \
-  --build-arg PROXY_CERT_URL="$PROXY_CERT_URL" \
-  --build-arg ISSUING_CA_CERT_URL="$ISSUING_CA_CERT_URL" \
-  --build-arg ROOT_CA_CERT_URL="$ROOT_CA_CERT_URL" \
-  ...
+  --build-arg PROXY_CERT_URL="${PROXY_CERT_URL:-}" \
+  --build-arg ISSUING_CA_CERT_URL="${ISSUING_CA_CERT_URL:-}" \
+  --build-arg ROOT_CA_CERT_URL="${ROOT_CA_CERT_URL:-}" \
+  -t <tag> .
 ```
-
-Or in `docker-compose.yml`:
 
 ```yaml
 build:
@@ -87,21 +89,19 @@ build:
     ROOT_CA_CERT_URL: ${ROOT_CA_CERT_URL:-}
 ```
 
-If the env vars are not set, the block is a no-op and the Dockerfile works in any environment.
-
-**Rules for new and existing Dockerfiles:**
+**Rules:**
 
 - The cert-install block must appear **before** any RUN that requires network access (NuGet restore, `npm install`, `apt-get install` of remote packages, `pip install`, etc.). If you retrofit an existing Dockerfile, move/insert the block accordingly.
-- Every `docker build` and `docker compose build` you execute must pass the three build args. Use this exact pattern (env vars default to empty so it works everywhere):
-  ```bash
-  docker build \
-    --build-arg PROXY_CERT_URL="${PROXY_CERT_URL:-}" \
-    --build-arg ISSUING_CA_CERT_URL="${ISSUING_CA_CERT_URL:-}" \
-    --build-arg ROOT_CA_CERT_URL="${ROOT_CA_CERT_URL:-}" \
-    -t <tag> .
-  ```
-- `docker-compose.yml` build sections must include the same args under `build.args` so `docker compose build` picks them up from the environment.
+- `docker-compose.yml` must include the three args under `build.args` so `docker compose build` picks them up from the environment.
 - If a build fails with TLS/SSL errors (e.g. `unable to get local issuer certificate`, `SSL_ERROR_SYSCALL`, NuGet `404`/`401` from a known-good feed), it is almost always a missing cert. Verify the block is present and the build args are being passed before doing anything else.
+
+### Private NuGet feed (.NET) — ALWAYS REQUIRED
+
+**Every .NET container must mount `nuget.config` and forward the feed env vars. Every `dotnet restore`/`dotnet build` command must do the same. No exceptions.** Skipping this means private packages won't resolve and the build fails.
+
+The `nuget.config` at `$RALPH_ROOT/ralph-specs/resources/nuget.config` uses env var placeholders — if `NUGET_PRIVATE_FEED_URL` is empty the private feed entry is a no-op and builds fall back to nuget.org. Always mount it.
+
+See the .NET rules for the exact `docker run` and `docker-compose.yml` patterns.
 
 ## Branching
 
