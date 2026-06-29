@@ -291,7 +291,15 @@ docker build \
 
 If you're running Ralph inside a corporate environment, you may need to configure some or all of the following:
 
-**Container CA certificates** — If your network uses a TLS-intercepting proxy or internal PKI, containers won't be able to reach package registries or external APIs without the CA certs. Pass them via the Dockerfile build args shown above.
+**Container CA certificates** — If your network uses a TLS-intercepting proxy or internal PKI, containers won't be able to reach package registries or external APIs without the CA certs. Set these env vars permanently in your shell (e.g. `~/.bashrc`):
+
+```bash
+export PROXY_CERT_URL="http://pki.example.com/proxy.cer"
+export ISSUING_CA_CERT_URL="http://pki.example.com/IssuingCA.pem.cer"
+export ROOT_CA_CERT_URL="http://pki.example.com/RootCA.pem.cer"
+```
+
+Ralph will pass these as build args to Dockerfiles and the agent will retrofit existing Dockerfiles in the target project to include the cert-install block.
 
 **Private NuGet feeds (.NET)** — Edit `ralph-specs/resources/nuget.config` and set the `NUGET_PRIVATE_FEED_URL` and `PROGET_DOTNET_TOKEN` environment variables:
 

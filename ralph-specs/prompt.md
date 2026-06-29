@@ -45,7 +45,10 @@ All installs, tests, builds, and seeding run in containers. Never install toolch
 
 ### Corporate proxy / CA certificates
 
-If the environment variables `PROXY_CERT_URL`, `ISSUING_CA_CERT_URL`, or `ROOT_CA_CERT_URL` are set, any Dockerfile you create must include the cert-install block so containers can reach external registries and APIs through the corporate proxy:
+If the environment variables `PROXY_CERT_URL`, `ISSUING_CA_CERT_URL`, or `ROOT_CA_CERT_URL` are set, any Dockerfile in the **current target project** must include the cert-install block so containers can reach external registries and APIs through the corporate proxy. This applies to:
+
+- Dockerfiles you create as part of an iteration.
+- **Existing Dockerfiles in the target project** — retrofit them to add the cert-install ARG/RUN block if missing. Do not touch Dockerfiles in other repos or in `$RALPH_ROOT`.
 
 ```dockerfile
 ARG PROXY_CERT_URL=""
