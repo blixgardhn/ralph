@@ -89,6 +89,20 @@ build:
 
 If the env vars are not set, the block is a no-op and the Dockerfile works in any environment.
 
+**Rules for new and existing Dockerfiles:**
+
+- The cert-install block must appear **before** any RUN that requires network access (NuGet restore, `npm install`, `apt-get install` of remote packages, `pip install`, etc.). If you retrofit an existing Dockerfile, move/insert the block accordingly.
+- Every `docker build` and `docker compose build` you execute must pass the three build args. Use this exact pattern (env vars default to empty so it works everywhere):
+  ```bash
+  docker build \
+    --build-arg PROXY_CERT_URL="${PROXY_CERT_URL:-}" \
+    --build-arg ISSUING_CA_CERT_URL="${ISSUING_CA_CERT_URL:-}" \
+    --build-arg ROOT_CA_CERT_URL="${ROOT_CA_CERT_URL:-}" \
+    -t <tag> .
+  ```
+- `docker-compose.yml` build sections must include the same args under `build.args` so `docker compose build` picks them up from the environment.
+- If a build fails with TLS/SSL errors (e.g. `unable to get local issuer certificate`, `SSL_ERROR_SYSCALL`, NuGet `404`/`401` from a known-good feed), it is almost always a missing cert. Verify the block is present and the build args are being passed before doing anything else.
+
 ## Branching
 
 - One feature branch per PRD: `ralph/prd-<PRD_ID>`. Never commit to main/master.
