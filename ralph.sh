@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Lean AI loop
-# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [--host-mode] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [--cheap-model <model>] [--strong-model <model>] [--host-mode] [--sidecar] [--target-repo path] [max_iterations]
 # Orchestrates short agent runs driven by prompt.md and tasks.json, archiving old runs when the PRD changes.
 
 set -euo pipefail
@@ -8,7 +8,10 @@ set -euo pipefail
 TOOL="opencode"
 MAX_ITERATIONS=30
 HOST_MODE=false
+SIDECAR_MODE=false
 OPENCODE_MODEL="${OPENCODE_MODEL:-}"
+OPENCODE_MODEL_CHEAP="${OPENCODE_MODEL_CHEAP:-}"
+OPENCODE_MODEL_STRONG="${OPENCODE_MODEL_STRONG:-}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 export RALPH_ROOT
 TARGET_REPO_ROOT="" # target repo root where code will be generated
@@ -39,6 +42,22 @@ parse_args() {
         OPENCODE_MODEL="${1#*=}"
         shift
         ;;
+      --cheap-model)
+        OPENCODE_MODEL_CHEAP="$2"
+        shift 2
+        ;;
+      --cheap-model=*)
+        OPENCODE_MODEL_CHEAP="${1#*=}"
+        shift
+        ;;
+      --strong-model)
+        OPENCODE_MODEL_STRONG="$2"
+        shift 2
+        ;;
+      --strong-model=*)
+        OPENCODE_MODEL_STRONG="${1#*=}"
+        shift
+        ;;
       --target-repo)
         TARGET_REPO="$2"
         TARGET_REPO_ARG="$2"
@@ -51,6 +70,10 @@ parse_args() {
         ;;
       --host-mode)
         HOST_MODE=true
+        shift
+        ;;
+      --sidecar)
+        SIDECAR_MODE=true
         shift
         ;;
       *)
@@ -215,8 +238,7 @@ detect_language_rules() {
   # Check for .NET
   if compgen -G "$TARGET_REPO_ROOT/*.sln" >/dev/null 2>&1 || \
      compgen -G "$TARGET_REPO_ROOT/*.csproj" >/dev/null 2>&1 || \
-     compgen -G "$TARGET_REPO_ROOT/**/*.csproj" >/dev/null 2>&1 || \
-     compgen -G "$TARGET_REPO_ROOT/src/**/*.csproj" >/dev/null 2>&1; then
+     find "$TARGET_REPO_ROOT" -maxdepth 4 -name "*.csproj" -print -quit 2>/dev/null | grep -q .; then
     has_dotnet=true
   fi
 
@@ -263,7 +285,8 @@ build_static_prompt() {
     prompt_block="### Missing prompt instructions\nNo prompt.md was found; proceed with caution."
   fi
 
-  # Resolve agents file (now a thin pointer, but still included for tools that use it)
+  # Resolve agents file — kept for resolution/fingerprinting but NOT injected into
+  # the iteration prompt (it's meta-runner documentation, not useful to the iteration agent).
   if [ -n "$RESOLVED_AGENTS_FILE" ] && [ -f "$RESOLVED_AGENTS_FILE" ]; then
     agents_block=$(cat "$RESOLVED_AGENTS_FILE")
   else
@@ -290,17 +313,59 @@ build_static_prompt() {
     host_mode_note="**Host mode is active.** You may run tools, tests, and builds directly on the host without containers. Container wrapping is not required this session."
   fi
 
+  # Sidecar mode note injection
+  local sidecar_mode_note=""
+  if [ "$SIDECAR_MODE" = true ]; then
+    sidecar_mode_note="**Sidecar mode is active.** Long-lived containers are running for this session. Use \`docker exec <container-name> <cmd>\` instead of \`docker run --rm\`. Available sidecars: \${RALPH_SIDECAR_NODE:-none}, \${RALPH_SIDECAR_PYTHON:-none}, \${RALPH_SIDECAR_DOTNET:-none}."
+  fi
+
   # Assemble static prompt: agents identity (thin) + prompt directive + rules
-  # The prompt.md has {{HOST_MODE_NOTE}} placeholder for host-mode injection.
+  # The prompt.md has {{HOST_MODE_NOTE}} and {{SIDECAR_MODE_NOTE}} placeholders.
   # Use perl to avoid bash ${//} issues with & and \ in replacement strings.
   prompt_block=$(HOST_MODE_NOTE="$host_mode_note" perl -0777 -pe \
     's/\Q{{HOST_MODE_NOTE}}\E/$ENV{HOST_MODE_NOTE}/g' <<< "$prompt_block")
+  prompt_block=$(SIDECAR_MODE_NOTE="$sidecar_mode_note" perl -0777 -pe \
+    's/\Q{{SIDECAR_MODE_NOTE}}\E/$ENV{SIDECAR_MODE_NOTE}/g' <<< "$prompt_block")
 
-  if [ -n "$agents_block" ]; then
-    STATIC_PROMPT="$(printf "%s\n\n%s\n%s" "$agents_block" "$prompt_block" "$rules_block")"
-  else
-    STATIC_PROMPT="$(printf "%s\n%s" "$prompt_block" "$rules_block")"
+  # Conditional cert/nuget injection — only include when project uses containers/Dockerfiles
+  local cert_rules_content="" nuget_rules_content=""
+  local has_dockerfiles=false has_dotnet_project=false
+
+  if compgen -G "$TARGET_REPO_ROOT/Dockerfile*" >/dev/null 2>&1 || \
+     find "$TARGET_REPO_ROOT" -maxdepth 4 -name "Dockerfile*" -print -quit 2>/dev/null | grep -q . || \
+     compgen -G "$TARGET_REPO_ROOT/docker-compose*" >/dev/null 2>&1; then
+    has_dockerfiles=true
   fi
+
+  if compgen -G "$TARGET_REPO_ROOT/*.sln" >/dev/null 2>&1 || \
+     find "$TARGET_REPO_ROOT" -maxdepth 4 -name "*.csproj" -print -quit 2>/dev/null | grep -q .; then
+    has_dotnet_project=true
+  fi
+
+  local cert_rules_file="$RALPH_ROOT/ralph-specs/CERT_RULES.md"
+  local nuget_rules_file="$RALPH_ROOT/ralph-specs/NUGET_RULES.md"
+
+  if [ "$has_dockerfiles" = true ] && [ -f "$cert_rules_file" ]; then
+    cert_rules_content=$(cat "$cert_rules_file")
+    echo "[Ralph] Cert rules included (Dockerfiles detected)" >&2
+  else
+    cert_rules_content="(Cert rules omitted — no Dockerfiles detected. See \$RALPH_ROOT/ralph-specs/CERT_RULES.md if building containers.)"
+  fi
+
+  if [ "$has_dotnet_project" = true ] && [ -f "$nuget_rules_file" ]; then
+    nuget_rules_content=$(cat "$nuget_rules_file")
+    echo "[Ralph] NuGet rules included (.NET project detected)" >&2
+  else
+    nuget_rules_content=""
+  fi
+
+  prompt_block=$(CERT_RULES="$cert_rules_content" perl -0777 -pe \
+    's/\Q{{CERT_RULES}}\E/$ENV{CERT_RULES}/g' <<< "$prompt_block")
+  prompt_block=$(NUGET_RULES="$nuget_rules_content" perl -0777 -pe \
+    's/\Q{{NUGET_RULES}}\E/$ENV{NUGET_RULES}/g' <<< "$prompt_block")
+
+  # Assemble static prompt: prompt directive + rules (agents_block excluded per Expert #3/#4 review)
+  STATIC_PROMPT="$(printf "%s\n%s" "$prompt_block" "$rules_block")"
 
   echo "[Ralph] Static prompt built ($(echo -n "$STATIC_PROMPT" | wc -c) bytes)" >&2
 }
@@ -335,6 +400,212 @@ extract_last_progress_entry() {
   else
     echo "$last_entry"
   fi
+}
+
+# Resolve the model to use for this iteration based on tier.
+# Priority: task.tier field > heuristic > OPENCODE_MODEL > default.
+# Returns the model string (or empty for default).
+resolve_iteration_model() {
+  local task_json="$1"
+  local is_retry="${2:-false}"
+
+  # If OPENCODE_MODEL is set and no tiering configured, use it directly
+  if [ -n "$OPENCODE_MODEL" ] && [ -z "$OPENCODE_MODEL_CHEAP" ] && [ -z "$OPENCODE_MODEL_STRONG" ]; then
+    echo "$OPENCODE_MODEL"
+    return
+  fi
+
+  # If no tiering configured at all, return empty (use tool default)
+  if [ -z "$OPENCODE_MODEL_CHEAP" ] && [ -z "$OPENCODE_MODEL_STRONG" ]; then
+    echo "$OPENCODE_MODEL"
+    return
+  fi
+
+  # Auto-promote to strong on retry (stuck-task escalation)
+  if [ "$is_retry" = "true" ] && [ -n "$OPENCODE_MODEL_STRONG" ]; then
+    echo "[Ralph][tier] Escalating to strong model on retry" >&2
+    echo "$OPENCODE_MODEL_STRONG"
+    return
+  fi
+
+  # Check task.tier field first (PRD-driven)
+  local task_tier=""
+  if [ -n "$task_json" ] && [ "$task_json" != "{}" ] && command -v jq >/dev/null 2>&1; then
+    task_tier=$(echo "$task_json" | jq -r '.tier // ""' 2>/dev/null || true)
+  fi
+
+  if [ "$task_tier" = "strong" ] && [ -n "$OPENCODE_MODEL_STRONG" ]; then
+    echo "[Ralph][tier] Using strong model (PRD-driven)" >&2
+    echo "$OPENCODE_MODEL_STRONG"
+    return
+  elif [ "$task_tier" = "cheap" ] && [ -n "$OPENCODE_MODEL_CHEAP" ]; then
+    echo "[Ralph][tier] Using cheap model (PRD-driven)" >&2
+    echo "$OPENCODE_MODEL_CHEAP"
+    return
+  fi
+
+  # Heuristic: strong if >=5 keyFiles OR ACs mention test/verify
+  local use_strong=false
+  if [ -n "$task_json" ] && [ "$task_json" != "{}" ] && command -v jq >/dev/null 2>&1; then
+    local key_files_count ac_has_test
+    key_files_count=$(echo "$task_json" | jq '(.keyFiles // []) | length' 2>/dev/null || echo 0)
+    ac_has_test=$(echo "$task_json" | jq '(.acceptanceCriteria // []) | map(ascii_downcase) | any(test("test|verify"))' 2>/dev/null || echo "false")
+    if [ "$key_files_count" -ge 5 ] 2>/dev/null || [ "$ac_has_test" = "true" ]; then
+      use_strong=true
+    fi
+  fi
+
+  if [ "$use_strong" = "true" ] && [ -n "$OPENCODE_MODEL_STRONG" ]; then
+    echo "[Ralph][tier] Using strong model (heuristic: keyFiles≥5 or ACs mention tests)" >&2
+    echo "$OPENCODE_MODEL_STRONG"
+  elif [ -n "$OPENCODE_MODEL_CHEAP" ]; then
+    echo "[Ralph][tier] Using cheap model (heuristic)" >&2
+    echo "$OPENCODE_MODEL_CHEAP"
+  else
+    echo "$OPENCODE_MODEL"
+  fi
+}
+
+# Inline small keyFiles from the task into the prompt to avoid tool-call round-trips.
+# Returns a block of <file> tags for files that exist and are under the size threshold.
+RALPH_MAX_INLINE_BYTES="${RALPH_MAX_INLINE_BYTES:-8000}"
+
+inline_keyfiles() {
+  local task_json="$1"
+  local result=""
+
+  if [ -z "$task_json" ] || [ "$task_json" = "{}" ]; then
+    echo ""
+    return
+  fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo ""
+    return
+  fi
+
+  local files
+  files=$(echo "$task_json" | jq -r '(.keyFiles // [])[]' 2>/dev/null || true)
+
+  if [ -z "$files" ]; then
+    echo ""
+    return
+  fi
+
+  while IFS= read -r filepath; do
+    # Skip files marked (create new)
+    if [[ "$filepath" == *"(create new)"* ]]; then
+      continue
+    fi
+
+    # Resolve relative to target repo
+    local full_path="$TARGET_REPO_ROOT/$filepath"
+    if [ ! -f "$full_path" ]; then
+      continue
+    fi
+
+    local size
+    size=$(stat -c%s "$full_path" 2>/dev/null || stat -f%z "$full_path" 2>/dev/null || echo 999999)
+    if [ "$size" -le "$RALPH_MAX_INLINE_BYTES" ] 2>/dev/null; then
+      result+=$(printf '\n<file path="%s">\n' "$filepath")
+      result+=$(cat "$full_path")
+      result+=$(printf '\n</file>\n')
+    fi
+  done <<< "$files"
+
+  echo "$result"
+}
+
+# ── Sidecar containers ──────────────────────────────────────────────
+# Long-lived containers for reuse across iterations (--sidecar mode).
+SIDECAR_IDS=()
+
+launch_sidecars() {
+  if [ "$SIDECAR_MODE" != true ]; then
+    return
+  fi
+
+  echo "[Ralph][sidecar] Launching sidecar containers..." >&2
+
+  local has_node=false has_python=false has_dotnet=false
+
+  [ -f "$TARGET_REPO_ROOT/package.json" ] && has_node=true
+  ([ -f "$TARGET_REPO_ROOT/pyproject.toml" ] || [ -f "$TARGET_REPO_ROOT/requirements.txt" ]) && has_python=true
+  (compgen -G "$TARGET_REPO_ROOT/*.sln" >/dev/null 2>&1 || find "$TARGET_REPO_ROOT" -maxdepth 4 -name "*.csproj" -print -quit 2>/dev/null | grep -q .) && has_dotnet=true
+
+  if [ "$has_node" = true ]; then
+    local id
+    id=$(docker run -d --name "ralph-sidecar-node-$$" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work node:20 sleep infinity 2>/dev/null || true)
+    if [ -n "$id" ]; then
+      SIDECAR_IDS+=("$id")
+      export RALPH_SIDECAR_NODE="ralph-sidecar-node-$$"
+      echo "[Ralph][sidecar] Node sidecar: $RALPH_SIDECAR_NODE" >&2
+    fi
+  fi
+
+  if [ "$has_python" = true ]; then
+    local id
+    id=$(docker run -d --name "ralph-sidecar-python-$$" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work python:3.11 sleep infinity 2>/dev/null || true)
+    if [ -n "$id" ]; then
+      SIDECAR_IDS+=("$id")
+      export RALPH_SIDECAR_PYTHON="ralph-sidecar-python-$$"
+      echo "[Ralph][sidecar] Python sidecar: $RALPH_SIDECAR_PYTHON" >&2
+    fi
+  fi
+
+  if [ "$has_dotnet" = true ]; then
+    local id
+    id=$(docker run -d --name "ralph-sidecar-dotnet-$$" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work mcr.microsoft.com/dotnet/sdk:8.0 sleep infinity 2>/dev/null || true)
+    if [ -n "$id" ]; then
+      SIDECAR_IDS+=("$id")
+      export RALPH_SIDECAR_DOTNET="ralph-sidecar-dotnet-$$"
+      echo "[Ralph][sidecar] .NET sidecar: $RALPH_SIDECAR_DOTNET" >&2
+    fi
+  fi
+
+  if [ ${#SIDECAR_IDS[@]} -eq 0 ]; then
+    echo "[Ralph][sidecar] No runtimes detected; no sidecars launched." >&2
+  fi
+}
+
+cleanup_sidecars() {
+  if [ ${#SIDECAR_IDS[@]} -eq 0 ]; then
+    return
+  fi
+  echo "[Ralph][sidecar] Cleaning up sidecar containers..." >&2
+  for id in "${SIDECAR_IDS[@]}"; do
+    docker rm -f "$id" >/dev/null 2>&1 || true
+  done
+  SIDECAR_IDS=()
+}
+
+# Check sidecar containers are still running; restart any that died.
+check_sidecars() {
+  if [ "$SIDECAR_MODE" != true ] || [ ${#SIDECAR_IDS[@]} -eq 0 ]; then
+    return
+  fi
+
+  local new_ids=()
+  for id in "${SIDECAR_IDS[@]}"; do
+    if docker inspect --format='{{.State.Running}}' "$id" 2>/dev/null | grep -q "true"; then
+      new_ids+=("$id")
+    else
+      local name
+      name=$(docker inspect --format='{{.Name}}' "$id" 2>/dev/null | sed 's|^/||' || echo "$id")
+      echo "[Ralph][sidecar] Container $name died; restarting..." >&2
+      docker rm -f "$id" >/dev/null 2>&1 || true
+      # Restart with same name and config
+      local new_id
+      new_id=$(docker run -d --name "$name" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work "${name##*-sidecar-}" sleep infinity 2>/dev/null || true)
+      if [ -n "$new_id" ]; then
+        new_ids+=("$new_id")
+        echo "[Ralph][sidecar] Restarted $name" >&2
+      else
+        echo "[Ralph][sidecar] Failed to restart $name" >&2
+      fi
+    fi
+  done
+  SIDECAR_IDS=("${new_ids[@]}")
 }
 
 require_prompt_file() {
@@ -602,6 +873,18 @@ build_iteration_prompt() {
   prompt=$(PROGRESS_BLOCK="$progress_block" perl -0777 -pe \
     's/\Q{{LAST_PROGRESS_ENTRY}}\E/$ENV{PROGRESS_BLOCK}/g' <<< "$prompt")
 
+  # Inline small keyFiles to reduce tool-call round-trips
+  local inlined_files
+  inlined_files=$(inline_keyfiles "$task_json")
+  if [ -n "$inlined_files" ]; then
+    local keyfiles_block
+    keyfiles_block=$(printf 'The following keyFiles have been pre-loaded. Do NOT re-read these files:\n%s' "$inlined_files")
+  else
+    local keyfiles_block="(No keyFiles pre-loaded; use file discovery as needed.)"
+  fi
+  prompt=$(KEYFILES_BLOCK="$keyfiles_block" perl -0777 -pe \
+    's/\Q{{INLINED_KEYFILES}}\E/$ENV{KEYFILES_BLOCK}/g' <<< "$prompt")
+
   printf '%s\n' "$prompt"
 }
 
@@ -609,6 +892,9 @@ run_iteration() {
   local iteration="$1"
   local iter_start
   iter_start=$(date +%s)
+
+  # Verify sidecars are alive before starting work
+  check_sidecars
 
   echo ""
   echo "==============================================================="
@@ -646,14 +932,21 @@ run_iteration() {
   merged_prompt=$(build_iteration_prompt "$SELECTED_TASK_JSON" "$last_progress")
 
   local OUTPUT
+  local is_retry="false"
+  if [ "$SAME_TASK_COUNT" -gt 1 ]; then
+    is_retry="true"
+  fi
+  local iteration_model
+  iteration_model=$(resolve_iteration_model "$SELECTED_TASK_JSON" "$is_retry")
+
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
   elif [[ "$TOOL" == "claude" ]]; then
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | claude --dangerously-skip-permissions --print 2>&1 | tee >(cat >&2)) || true
   else
     local model_flag=""
-    if [[ -n "$OPENCODE_MODEL" ]]; then
-      model_flag="--model $OPENCODE_MODEL"
+    if [[ -n "$iteration_model" ]]; then
+      model_flag="--model $iteration_model"
     fi
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | opencode run $model_flag 2>&1 | tee >(cat >&2)) || true
   fi
@@ -742,6 +1035,46 @@ run_iteration() {
   echo "Iteration $iteration finished; continuing..."
 }
 
+# Pre-flight: verify the AI tool is reachable and permissions are correct.
+# Only for opencode (amp/claude use --dangerously-* flags that bypass permissions).
+preflight_tool_check() {
+  if [ "$TOOL" != "opencode" ]; then
+    return 0
+  fi
+
+  echo "[Ralph] Pre-flight: verifying OpenCode permissions..." >&2
+  local model_flag=""
+  if [[ -n "$OPENCODE_MODEL_CHEAP" ]]; then
+    model_flag="--model $OPENCODE_MODEL_CHEAP"
+  elif [[ -n "$OPENCODE_MODEL" ]]; then
+    model_flag="--model $OPENCODE_MODEL"
+  fi
+
+  local probe_output
+  probe_output=$(cd "$TARGET_REPO_ROOT" && printf "Reply with exactly: RALPH_OK" | timeout 60 opencode run $model_flag 2>&1) || true
+
+  if echo "$probe_output" | grep -q "RALPH_OK"; then
+    echo "[Ralph] Pre-flight passed." >&2
+    return 0
+  fi
+
+  echo "" >&2
+  echo "========================================" >&2
+  echo "ERROR: OpenCode pre-flight check failed." >&2
+  echo "The tool could not complete a trivial request." >&2
+  echo "" >&2
+  echo "Common causes:" >&2
+  echo "  - Missing permissions in ~/.config/opencode/opencode.json" >&2
+  echo "  - All tool permissions must be set to \"allow\"" >&2
+  echo "  - external_directory must include your project path" >&2
+  echo "  - Model/provider not configured or unreachable" >&2
+  echo "" >&2
+  echo "Probe output (last 10 lines):" >&2
+  echo "$probe_output" | tail -10 >&2
+  echo "========================================" >&2
+  notify_and_exit 1 "Ralph: Pre-flight Failed" "OpenCode pre-flight check failed. Check permissions and model config." 1
+}
+
 run_iterations() {
   echo "Starting Ralph - Tool: $TOOL - Max iterations: $MAX_ITERATIONS$([ "$HOST_MODE" = true ] && echo " [host-mode]")"
 
@@ -795,6 +1128,11 @@ main() {
   if [ "$HOST_MODE" = true ]; then
     echo "[Ralph] Host mode active: containers not required for tooling." >&2
   fi
+  # Launch sidecar containers if --sidecar mode
+  launch_sidecars
+  trap cleanup_sidecars EXIT
+  # Verify the AI tool is reachable before burning full iterations
+  preflight_tool_check
   run_iterations
 }
 

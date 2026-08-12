@@ -226,20 +226,45 @@ The PRD skill runs 8 specialized roles (clarification, scope, feasibility, codeb
 | `--tool` | `opencode` | AI tool to use (`opencode`, `amp`, `claude`) |
 | `--target-repo` | current directory | Path to the project repository |
 | `--host-mode` | off | Skip container wrapping; run builds/tests directly on host |
+| `--sidecar` | off | Reuse long-lived containers across iterations (reduces cold-start overhead) |
 | `--opencode-model` | OpenCode default | Override the OpenCode model (or set `OPENCODE_MODEL` in `.env`) |
+| `--cheap-model` | none | Model for simple tasks (docs, config, plumbing). Set `OPENCODE_MODEL_CHEAP` in `.env` |
+| `--strong-model` | none | Model for complex tasks (logic, tests, multi-file). Set `OPENCODE_MODEL_STRONG` in `.env` |
 | `[max_iterations]` | `30` | Maximum number of iterations |
 
 ### What Ralph does each iteration
 
 1. Create/switch to the feature branch (from `branchName` in tasks.json)
 2. Select the next unblocked task where `passes: false`
-3. Inject the task JSON and recent progress into the prompt
-4. Run the AI tool to implement the task
-5. Verify (tests, typecheck, build — in containers by default)
-6. Commit if checks pass
-7. Mark the task `passes: true` in `.ralph/tasks.json`
-8. Append learnings to `.ralph/progress.md`
-9. Repeat until all tasks pass or max iterations reached
+3. Inline small keyFiles into the prompt (avoids tool-call round-trips)
+4. Resolve model tier (cheap/strong) based on task complexity
+5. Inject the task JSON and recent progress into the prompt
+6. Run the AI tool to implement the task
+7. Verify (tests, typecheck, build — in containers by default)
+8. Commit if checks pass
+9. Mark the task `passes: true` in `.ralph/tasks.json`
+10. Append learnings to `.ralph/progress.md`
+11. Repeat until all tasks pass or max iterations reached
+
+### Cost Optimization
+
+Ralph includes several features to reduce API costs:
+
+**Two-tier model routing** — Set `OPENCODE_MODEL_CHEAP` and `OPENCODE_MODEL_STRONG` in your `.env`. Simple tasks (docs, config, renames) route to the cheap model; complex tasks (multi-file logic, test writing) route to the strong model. The PRD skill can also set `tier: "cheap"` or `"strong"` per task.
+
+```bash
+# Example .env
+OPENCODE_MODEL_CHEAP=github-copilot/claude-sonnet-4
+OPENCODE_MODEL_STRONG=github-copilot/claude-opus-4
+```
+
+**Auto-promote on retry** — If a task gets stuck (same task selected twice), the second attempt automatically escalates to the strong model.
+
+**KeyFiles inlining** — Small files listed in `keyFiles` (≤8KB by default) are pre-loaded into the prompt, eliminating 1–3 tool-call round-trips per iteration. Configure with `RALPH_MAX_INLINE_BYTES`.
+
+**Conditional rules injection** — Cert/NuGet/container rules are only included when the project uses Dockerfiles or .NET. Non-container projects get a smaller prompt.
+
+**Sidecar containers** — Use `--sidecar` to launch long-lived containers at loop start. Eliminates cold-start overhead on every `docker run`. Opt-in due to potential state leakage between iterations.
 
 ### Stop conditions
 
