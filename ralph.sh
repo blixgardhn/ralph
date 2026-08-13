@@ -412,6 +412,10 @@ extract_selected_task_json() {
 
 # Extract the last progress entry from progress.md for context injection.
 # Returns the last ## section (from last "## " heading to end or next "---").
+# Capped at RALPH_PROGRESS_INJECT_MAX_CHARS to prevent unbounded growth eating
+# iteration context budget.
+RALPH_PROGRESS_INJECT_MAX_CHARS="${RALPH_PROGRESS_INJECT_MAX_CHARS:-2000}"
+
 extract_last_progress_entry() {
   if [ ! -f "$PROGRESS_FILE" ]; then
     echo "(No progress history yet)"
@@ -424,6 +428,17 @@ extract_last_progress_entry() {
 
   if [ -z "$last_entry" ]; then
     echo "(No progress entries yet)"
+    return
+  fi
+
+  # Cap size to avoid injecting bloat
+  local entry_size
+  entry_size=$(echo -n "$last_entry" | wc -c)
+  if [ "$entry_size" -gt "$RALPH_PROGRESS_INJECT_MAX_CHARS" ]; then
+    # Take first N chars, add truncation marker
+    echo "$last_entry" | head -c "$RALPH_PROGRESS_INJECT_MAX_CHARS"
+    echo ""
+    echo "... [truncated: entry was $entry_size chars, capped at $RALPH_PROGRESS_INJECT_MAX_CHARS]"
   else
     echo "$last_entry"
   fi
@@ -941,6 +956,12 @@ run_iteration() {
 
   # Verify sidecars are alive before starting work
   check_sidecars
+
+  # Truncate last-verify.log so only the current iteration's verify output
+  # is retained. Prevents unbounded growth and stale grep hits from prior runs.
+  if [ -f "$TARGET_REPO_ROOT/.ralph/last-verify.log" ]; then
+    : > "$TARGET_REPO_ROOT/.ralph/last-verify.log"
+  fi
 
   echo ""
   echo "==============================================================="
