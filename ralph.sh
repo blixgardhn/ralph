@@ -19,6 +19,10 @@ OPENCODE_MODEL_STRONG="${OPENCODE_MODEL_STRONG:-}"
 #   strong tier (Opus-class): comfortable through ~120K
 OPENCODE_MODEL_CHEAP_MAX_CONTEXT="${OPENCODE_MODEL_CHEAP_MAX_CONTEXT:-48000}"
 OPENCODE_MODEL_STRONG_MAX_CONTEXT="${OPENCODE_MODEL_STRONG_MAX_CONTEXT:-120000}"
+# Context expansion factor: multiplies the initial prompt token estimate to
+# approximate the runtime context after tool calls, file reads, and edits.
+# Base factor + (keyFiles_count / 2). Tunable via env var.
+RALPH_CONTEXT_EXPANSION_BASE="${RALPH_CONTEXT_EXPANSION_BASE:-2}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 export RALPH_ROOT
 TARGET_REPO_ROOT="" # target repo root where code will be generated
@@ -974,10 +978,26 @@ run_iteration() {
   merged_prompt=$(build_iteration_prompt "$SELECTED_TASK_JSON" "$last_progress")
 
   # Estimate prompt token count (rough: chars / 4)
-  local prompt_chars estimated_tokens
+  local prompt_chars initial_tokens key_files_count expansion_factor estimated_tokens
   prompt_chars=$(echo -n "$merged_prompt" | wc -c)
-  estimated_tokens=$((prompt_chars / 4))
-  echo "[Ralph][context] Prompt size: ${prompt_chars} chars ≈ ${estimated_tokens} tokens" >&2
+  initial_tokens=$((prompt_chars / 4))
+
+  # Compute expansion factor based on task characteristics.
+  # Base factor accounts for OpenCode's own system prompt (~4-8K) + expected
+  # tool-call responses. Per-keyFile bonus accounts for file reads during
+  # implementation. Test-heavy tasks expand more due to test iteration.
+  key_files_count=0
+  if [ -n "$SELECTED_TASK_JSON" ] && [ "$SELECTED_TASK_JSON" != "{}" ] && command -v jq >/dev/null 2>&1; then
+    key_files_count=$(echo "$SELECTED_TASK_JSON" | jq '(.keyFiles // []) | length' 2>/dev/null || echo 0)
+  fi
+  expansion_factor=$((RALPH_CONTEXT_EXPANSION_BASE + key_files_count / 2))
+  # Cap at 6x to avoid absurd upgrades on huge PRDs
+  if [ "$expansion_factor" -gt 6 ]; then
+    expansion_factor=6
+  fi
+  estimated_tokens=$((initial_tokens * expansion_factor))
+
+  echo "[Ralph][context] Prompt: ${prompt_chars} chars ≈ ${initial_tokens} tokens; expansion ×${expansion_factor} (keyFiles=${key_files_count}) → est. runtime ${estimated_tokens} tokens" >&2
 
   local OUTPUT
   local is_retry="false"

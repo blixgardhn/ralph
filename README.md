@@ -262,7 +262,7 @@ OPENCODE_MODEL_STRONG=github-copilot/claude-opus-4
 
 **Auto-promote on retry** — If a task gets stuck (same task selected twice), the second attempt automatically escalates to the strong model.
 
-**Context-aware auto-upgrade** — Before each iteration, Ralph estimates prompt token count (chars/4). If the estimate exceeds `--cheap-max-context` (default 48000) and the initial tier was cheap, Ralph auto-upgrades to strong for that iteration. Prevents cheap-tier models from choking on oversized prompts (which manifests as very slow responses). Tune these thresholds based on your model's real capacity.
+**Context-aware auto-upgrade** — Before each iteration, Ralph estimates the *runtime* context size by measuring the initial prompt (chars/4) and multiplying by an expansion factor. The factor accounts for OpenCode's own system prompt, tool-call responses, and file reads that happen during the iteration. Formula: `expansion = RALPH_CONTEXT_EXPANSION_BASE + keyFiles_count / 2` (capped at 6×). If the estimated runtime tokens exceeds `--cheap-max-context` (default 48000) and the initial tier was cheap, Ralph auto-upgrades to strong. Prevents cheap-tier models from choking on large context (which manifests as very slow responses). Tune `RALPH_CONTEXT_EXPANSION_BASE` (default 2) if the estimate is consistently too high or too low.
 
 **KeyFiles inlining** — Small files listed in `keyFiles` (≤8KB by default) are pre-loaded into the prompt, eliminating 1–3 tool-call round-trips per iteration. Configure with `RALPH_MAX_INLINE_BYTES`.
 
