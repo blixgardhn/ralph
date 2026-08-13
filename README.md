@@ -177,14 +177,17 @@ If you prefer to install skills for a single tool instead of using the installer
 # OpenCode
 cp -r skills/prd ~/.config/opencode/skills/
 cp -r skills/ralph_runner ~/.config/opencode/skills/
+cp -r skills/ralph_tuner ~/.config/opencode/skills/
 
 # Amp
 cp -r skills/prd ~/.config/amp/skills/
 cp -r skills/ralph_runner ~/.config/amp/skills/
+cp -r skills/ralph_tuner ~/.config/amp/skills/
 
 # Claude Code
 cp -r skills/prd ~/.claude/skills/
 cp -r skills/ralph_runner ~/.claude/skills/
+cp -r skills/ralph_tuner ~/.claude/skills/
 ```
 
 ## Workflow Details
@@ -384,6 +387,7 @@ Ralph relies on automated feedback:
 | `scripts/check_prd.sh` | Validates tasks.json structure and dependencies |
 | `skills/prd/` | PRD generation skill |
 | `skills/ralph_runner/` | Ralph runner skill |
+| `skills/ralph_tuner/` | Ralph tuning skill — analyzes `.ralph/cost.jsonl` for evidence-based tuning |
 
 ### Target repo files (created by Ralph)
 
