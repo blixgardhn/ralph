@@ -230,6 +230,8 @@ The PRD skill runs 8 specialized roles (clarification, scope, feasibility, codeb
 | `--opencode-model` | OpenCode default | Override the OpenCode model (or set `OPENCODE_MODEL` in `.env`) |
 | `--cheap-model` | none | Model for simple tasks (docs, config, plumbing). Set `OPENCODE_MODEL_CHEAP` in `.env` |
 | `--strong-model` | none | Model for complex tasks (logic, tests, multi-file). Set `OPENCODE_MODEL_STRONG` in `.env` |
+| `--cheap-max-context` | `48000` | Max estimated prompt tokens before auto-upgrading cheap→strong |
+| `--strong-max-context` | `120000` | Max estimated prompt tokens before logging a context-size warning |
 | `[max_iterations]` | `30` | Maximum number of iterations |
 
 ### What Ralph does each iteration
@@ -259,6 +261,8 @@ OPENCODE_MODEL_STRONG=github-copilot/claude-opus-4
 ```
 
 **Auto-promote on retry** — If a task gets stuck (same task selected twice), the second attempt automatically escalates to the strong model.
+
+**Context-aware auto-upgrade** — Before each iteration, Ralph estimates prompt token count (chars/4). If the estimate exceeds `--cheap-max-context` (default 48000) and the initial tier was cheap, Ralph auto-upgrades to strong for that iteration. Prevents cheap-tier models from choking on oversized prompts (which manifests as very slow responses). Tune these thresholds based on your model's real capacity.
 
 **KeyFiles inlining** — Small files listed in `keyFiles` (≤8KB by default) are pre-loaded into the prompt, eliminating 1–3 tool-call round-trips per iteration. Configure with `RALPH_MAX_INLINE_BYTES`.
 

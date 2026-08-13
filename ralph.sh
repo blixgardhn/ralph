@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Lean AI loop
-# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [--cheap-model <model>] [--strong-model <model>] [--host-mode] [--sidecar] [--target-repo path] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [--cheap-model <model>] [--strong-model <model>] [--cheap-max-context <tokens>] [--strong-max-context <tokens>] [--host-mode] [--sidecar] [--target-repo path] [max_iterations]
 # Orchestrates short agent runs driven by prompt.md and tasks.json, archiving old runs when the PRD changes.
 
 set -euo pipefail
@@ -12,6 +12,13 @@ SIDECAR_MODE=false
 OPENCODE_MODEL="${OPENCODE_MODEL:-}"
 OPENCODE_MODEL_CHEAP="${OPENCODE_MODEL_CHEAP:-}"
 OPENCODE_MODEL_STRONG="${OPENCODE_MODEL_STRONG:-}"
+# Context capacity thresholds (approximate tokens) for tier auto-upgrade.
+# When estimated prompt tokens exceed CHEAP_MAX, auto-upgrade to strong.
+# Defaults tuned for typical performance sweet-spots (not absolute model limits):
+#   cheap tier (Sonnet-class): degrades past ~48K, upgrade before that
+#   strong tier (Opus-class): comfortable through ~120K
+OPENCODE_MODEL_CHEAP_MAX_CONTEXT="${OPENCODE_MODEL_CHEAP_MAX_CONTEXT:-48000}"
+OPENCODE_MODEL_STRONG_MAX_CONTEXT="${OPENCODE_MODEL_STRONG_MAX_CONTEXT:-120000}"
 RALPH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # location of this script and its dependencies
 export RALPH_ROOT
 TARGET_REPO_ROOT="" # target repo root where code will be generated
@@ -56,6 +63,22 @@ parse_args() {
         ;;
       --strong-model=*)
         OPENCODE_MODEL_STRONG="${1#*=}"
+        shift
+        ;;
+      --cheap-max-context)
+        OPENCODE_MODEL_CHEAP_MAX_CONTEXT="$2"
+        shift 2
+        ;;
+      --cheap-max-context=*)
+        OPENCODE_MODEL_CHEAP_MAX_CONTEXT="${1#*=}"
+        shift
+        ;;
+      --strong-max-context)
+        OPENCODE_MODEL_STRONG_MAX_CONTEXT="$2"
+        shift 2
+        ;;
+      --strong-max-context=*)
+        OPENCODE_MODEL_STRONG_MAX_CONTEXT="${1#*=}"
         shift
         ;;
       --target-repo)
@@ -408,6 +431,7 @@ extract_last_progress_entry() {
 resolve_iteration_model() {
   local task_json="$1"
   local is_retry="${2:-false}"
+  local estimated_tokens="${3:-0}"
 
   # If OPENCODE_MODEL is set and no tiering configured, use it directly
   if [ -n "$OPENCODE_MODEL" ] && [ -z "$OPENCODE_MODEL_CHEAP" ] && [ -z "$OPENCODE_MODEL_STRONG" ]; then
@@ -428,6 +452,9 @@ resolve_iteration_model() {
     return
   fi
 
+  # Determine initial tier (before context check)
+  local chosen_tier="" chosen_model=""
+
   # Check task.tier field first (PRD-driven)
   local task_tier=""
   if [ -n "$task_json" ] && [ "$task_json" != "{}" ] && command -v jq >/dev/null 2>&1; then
@@ -435,35 +462,50 @@ resolve_iteration_model() {
   fi
 
   if [ "$task_tier" = "strong" ] && [ -n "$OPENCODE_MODEL_STRONG" ]; then
-    echo "[Ralph][tier] Using strong model (PRD-driven)" >&2
-    echo "$OPENCODE_MODEL_STRONG"
-    return
+    chosen_tier="strong"; chosen_model="$OPENCODE_MODEL_STRONG"
+    echo "[Ralph][tier] Initial: strong model (PRD-driven)" >&2
   elif [ "$task_tier" = "cheap" ] && [ -n "$OPENCODE_MODEL_CHEAP" ]; then
-    echo "[Ralph][tier] Using cheap model (PRD-driven)" >&2
-    echo "$OPENCODE_MODEL_CHEAP"
-    return
-  fi
+    chosen_tier="cheap"; chosen_model="$OPENCODE_MODEL_CHEAP"
+    echo "[Ralph][tier] Initial: cheap model (PRD-driven)" >&2
+  else
+    # Heuristic fallback: strong if >=5 keyFiles OR ACs mention test/verify
+    local use_strong=false
+    if [ -n "$task_json" ] && [ "$task_json" != "{}" ] && command -v jq >/dev/null 2>&1; then
+      local key_files_count ac_has_test
+      key_files_count=$(echo "$task_json" | jq '(.keyFiles // []) | length' 2>/dev/null || echo 0)
+      ac_has_test=$(echo "$task_json" | jq '(.acceptanceCriteria // []) | map(ascii_downcase) | any(test("test|verify"))' 2>/dev/null || echo "false")
+      if [ "$key_files_count" -ge 5 ] 2>/dev/null || [ "$ac_has_test" = "true" ]; then
+        use_strong=true
+      fi
+    fi
 
-  # Heuristic: strong if >=5 keyFiles OR ACs mention test/verify
-  local use_strong=false
-  if [ -n "$task_json" ] && [ "$task_json" != "{}" ] && command -v jq >/dev/null 2>&1; then
-    local key_files_count ac_has_test
-    key_files_count=$(echo "$task_json" | jq '(.keyFiles // []) | length' 2>/dev/null || echo 0)
-    ac_has_test=$(echo "$task_json" | jq '(.acceptanceCriteria // []) | map(ascii_downcase) | any(test("test|verify"))' 2>/dev/null || echo "false")
-    if [ "$key_files_count" -ge 5 ] 2>/dev/null || [ "$ac_has_test" = "true" ]; then
-      use_strong=true
+    if [ "$use_strong" = "true" ] && [ -n "$OPENCODE_MODEL_STRONG" ]; then
+      chosen_tier="strong"; chosen_model="$OPENCODE_MODEL_STRONG"
+      echo "[Ralph][tier] Initial: strong model (heuristic: keyFiles≥5 or ACs mention tests)" >&2
+    elif [ -n "$OPENCODE_MODEL_CHEAP" ]; then
+      chosen_tier="cheap"; chosen_model="$OPENCODE_MODEL_CHEAP"
+      echo "[Ralph][tier] Initial: cheap model (heuristic)" >&2
+    else
+      chosen_tier="strong"; chosen_model="$OPENCODE_MODEL_STRONG"
     fi
   fi
 
-  if [ "$use_strong" = "true" ] && [ -n "$OPENCODE_MODEL_STRONG" ]; then
-    echo "[Ralph][tier] Using strong model (heuristic: keyFiles≥5 or ACs mention tests)" >&2
-    echo "$OPENCODE_MODEL_STRONG"
-  elif [ -n "$OPENCODE_MODEL_CHEAP" ]; then
-    echo "[Ralph][tier] Using cheap model (heuristic)" >&2
-    echo "$OPENCODE_MODEL_CHEAP"
-  else
-    echo "$OPENCODE_MODEL"
+  # Context-size auto-upgrade: if estimated tokens exceed cheap tier's comfort
+  # zone, upgrade to strong (or warn if already strong and near strong's limit).
+  if [ "$estimated_tokens" -gt 0 ] 2>/dev/null; then
+    if [ "$chosen_tier" = "cheap" ] && [ "$estimated_tokens" -gt "$OPENCODE_MODEL_CHEAP_MAX_CONTEXT" ] 2>/dev/null; then
+      if [ -n "$OPENCODE_MODEL_STRONG" ]; then
+        echo "[Ralph][tier] Auto-upgrade cheap→strong: estimated $estimated_tokens tokens exceeds cheap max ($OPENCODE_MODEL_CHEAP_MAX_CONTEXT)" >&2
+        chosen_model="$OPENCODE_MODEL_STRONG"
+      else
+        echo "[Ralph][tier] WARN: estimated $estimated_tokens tokens exceeds cheap max but no strong model configured" >&2
+      fi
+    elif [ "$chosen_tier" = "strong" ] && [ "$estimated_tokens" -gt "$OPENCODE_MODEL_STRONG_MAX_CONTEXT" ] 2>/dev/null; then
+      echo "[Ralph][tier] WARN: estimated $estimated_tokens tokens exceeds strong max ($OPENCODE_MODEL_STRONG_MAX_CONTEXT); performance may degrade" >&2
+    fi
   fi
+
+  echo "$chosen_model"
 }
 
 # Inline small keyFiles from the task into the prompt to avoid tool-call round-trips.
@@ -931,13 +973,19 @@ run_iteration() {
   local merged_prompt
   merged_prompt=$(build_iteration_prompt "$SELECTED_TASK_JSON" "$last_progress")
 
+  # Estimate prompt token count (rough: chars / 4)
+  local prompt_chars estimated_tokens
+  prompt_chars=$(echo -n "$merged_prompt" | wc -c)
+  estimated_tokens=$((prompt_chars / 4))
+  echo "[Ralph][context] Prompt size: ${prompt_chars} chars ≈ ${estimated_tokens} tokens" >&2
+
   local OUTPUT
   local is_retry="false"
   if [ "$SAME_TASK_COUNT" -gt 1 ]; then
     is_retry="true"
   fi
   local iteration_model
-  iteration_model=$(resolve_iteration_model "$SELECTED_TASK_JSON" "$is_retry")
+  iteration_model=$(resolve_iteration_model "$SELECTED_TASK_JSON" "$is_retry" "$estimated_tokens")
 
   if [[ "$TOOL" == "amp" ]]; then
     OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | amp --dangerously-allow-all 2>&1 | tee >(cat >&2)) || true
