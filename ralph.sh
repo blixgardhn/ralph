@@ -949,6 +949,36 @@ build_iteration_prompt() {
   printf '%s\n' "$prompt"
 }
 
+# Append a JSON line summarizing this iteration's cost signals to .ralph/cost.jsonl.
+# Fields: timestamp, iteration, task_id, tier, model, initial_tokens, estimated_tokens,
+# expansion_factor, duration_sec, outcome (task_complete|continued|stopped|error|complete).
+log_iteration_cost() {
+  local iteration="$1"
+  local task_id="$2"
+  local model="$3"
+  local initial_tokens="$4"
+  local estimated_tokens="$5"
+  local expansion_factor="$6"
+  local duration_sec="$7"
+  local outcome="$8"
+
+  local cost_log="$TARGET_REPO_ROOT/.ralph/cost.jsonl"
+  local tier="unknown"
+  if [ "$model" = "$OPENCODE_MODEL_STRONG" ]; then
+    tier="strong"
+  elif [ "$model" = "$OPENCODE_MODEL_CHEAP" ]; then
+    tier="cheap"
+  fi
+
+  local ts
+  ts=$(date --iso-8601=seconds 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+  # Write a compact JSON line; no jq dependency here — hand-format
+  printf '{"ts":"%s","iter":%d,"task":"%s","tier":"%s","model":"%s","initial_tokens":%d,"estimated_tokens":%d,"expansion":%d,"duration_sec":%d,"outcome":"%s"}\n' \
+    "$ts" "$iteration" "$task_id" "$tier" "$model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$duration_sec" "$outcome" \
+    >> "$cost_log" 2>/dev/null || true
+}
+
 run_iteration() {
   local iteration="$1"
   local iter_start
@@ -1055,6 +1085,7 @@ run_iteration() {
     iter_end=$(date +%s)
     elapsed=$((iter_end - iter_start))
     loop_elapsed=$((iter_end - LOOP_START_SECS))
+    log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "complete"
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
     notify_and_exit 0 "Ralph: All Tasks Complete" "All tasks completed at iteration $iteration of $MAX_ITERATIONS.\n<b>Iteration time:</b> $(format_duration "$elapsed")\n<b>Total time:</b> $(format_duration "$loop_elapsed")" 0
   fi
@@ -1067,6 +1098,7 @@ run_iteration() {
     iter_end=$(date +%s)
     elapsed=$((iter_end - iter_start))
     loop_elapsed=$((iter_end - LOOP_START_SECS))
+    log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "stopped"
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
     notify_and_exit 0 "Ralph: Stopped" "Agent requested stop at iteration $iteration of $MAX_ITERATIONS.\n<b>Iteration time:</b> $(format_duration "$elapsed")\n<b>Total time:</b> $(format_duration "$loop_elapsed")" 1
   fi
@@ -1089,6 +1121,7 @@ run_iteration() {
     iter_end=$(date +%s)
     elapsed=$((iter_end - iter_start))
     loop_elapsed=$((iter_end - LOOP_START_SECS))
+    log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "error"
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
     notify_and_exit 1 "Ralph: Error" "Unrecoverable error at iteration $iteration. Check output for details." 1
   fi
@@ -1119,6 +1152,12 @@ run_iteration() {
     remaining_tasks=0
   fi
   completed_tasks=$(compute_completed_tasks "$TOTAL_TASKS" "$remaining_tasks")
+  # Determine outcome for cost log
+  local iter_outcome="continued"
+  if echo "$OUTPUT" | grep -q "<promise>TASK_COMPLETE</promise>"; then
+    iter_outcome="task_complete"
+  fi
+  log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "$iter_outcome"
   echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
   render_progress "$completed_tasks" "$remaining_tasks" "$loop_elapsed"
   echo "Iteration $iteration finished; continuing..."

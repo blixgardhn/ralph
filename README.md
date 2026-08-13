@@ -264,6 +264,16 @@ OPENCODE_MODEL_STRONG=github-copilot/claude-opus-4
 
 **Context-aware auto-upgrade** — Before each iteration, Ralph estimates the *runtime* context size by measuring the initial prompt (chars/4) and multiplying by an expansion factor. The factor accounts for OpenCode's own system prompt, tool-call responses, and file reads that happen during the iteration. Formula: `expansion = RALPH_CONTEXT_EXPANSION_BASE + keyFiles_count / 2` (capped at 6×). If the estimated runtime tokens exceeds `--cheap-max-context` (default 48000) and the initial tier was cheap, Ralph auto-upgrades to strong. Prevents cheap-tier models from choking on large context (which manifests as very slow responses). Tune `RALPH_CONTEXT_EXPANSION_BASE` (default 2) if the estimate is consistently too high or too low.
 
+**Cost logging** — Every iteration appends one JSON line to `.ralph/cost.jsonl` in the target repo with timestamp, iteration number, task ID, tier, model, initial/estimated tokens, expansion factor, duration, and outcome. Use `jq` to aggregate for tuning:
+
+```bash
+# Average duration and estimated tokens per tier
+jq -s 'group_by(.tier) | map({tier: .[0].tier, avg_duration: (map(.duration_sec) | add / length), avg_tokens: (map(.estimated_tokens) | add / length), count: length})' .ralph/cost.jsonl
+
+# Total time spent per model
+jq -s 'group_by(.model) | map({model: .[0].model, total_sec: (map(.duration_sec) | add)})' .ralph/cost.jsonl
+```
+
 **KeyFiles inlining** — Small files listed in `keyFiles` (≤8KB by default) are pre-loaded into the prompt, eliminating 1–3 tool-call round-trips per iteration. Configure with `RALPH_MAX_INLINE_BYTES`.
 
 **Conditional rules injection** — Cert/NuGet/container rules are only included when the project uses Dockerfiles or .NET. Non-container projects get a smaller prompt.
