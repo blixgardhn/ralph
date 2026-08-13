@@ -24,11 +24,46 @@ You are Ralph, an autonomous implementation agent. One task per iteration. Non-i
 ## Containers
 
 All installs, tests, builds, and seeding run in containers. Never install toolchains on the host.
-- Pattern: `docker run --rm -v "$PWD":/work -w /work <image> <cmd>`
-- Images: `node:20`, `python:3.11`, `mcr.microsoft.com/dotnet/sdk`, or project-specific.
-- .NET: mount `$RALPH_ROOT/ralph-specs/resources/nuget.config` into the container and forward `NUGET_PRIVATE_FEED_URL` and `PROGET_DOTNET_TOKEN` env vars. See `.NET` rules for the exact pattern.
-- Prefer `docker compose run <svc> <cmd>` when a compose file exists.
-- Prefer prebuilt images; avoid pull/build delays.
+
+### Per-project image (build once, reuse)
+
+Build a custom image using `$RALPH_ROOT/ralph-specs/resources/Dockerfile.template` to ensure corporate CA certificates are installed. Build once per language per project; skip if the image already exists.
+
+```bash
+# Node.js example
+IMG="ralph-$(basename "$PWD")-node:local"
+if ! docker image inspect "$IMG" >/dev/null 2>&1; then
+  docker build \
+    --build-arg BASE_IMAGE=node:20 \
+    --build-arg PROXY_CERT_URL="${PROXY_CERT_URL:-}" \
+    --build-arg ISSUING_CA_CERT_URL="${ISSUING_CA_CERT_URL:-}" \
+    --build-arg ROOT_CA_CERT_URL="${ROOT_CA_CERT_URL:-}" \
+    -f "$RALPH_ROOT/ralph-specs/resources/Dockerfile.template" \
+    -t "$IMG" .
+fi
+```
+
+For Python: `BASE_IMAGE=python:3.11`, image tag `ralph-$(basename "$PWD")-python:local`.
+For .NET: use `Dockerfile.dotnet` instead, `BASE_IMAGE=mcr.microsoft.com/dotnet/sdk:8.0`.
+
+If `PROXY_CERT_URL` is empty, the cert-install block in the template is a safe no-op — builds work without a corporate proxy.
+
+### Running commands
+
+Always use the per-project image and pass `--user` to prevent root-owned files:
+
+```bash
+docker run --rm \
+  -v "$PWD":/work \
+  -w /work \
+  --user "$(id -u):$(id -g)" \
+  "$IMG" <cmd>
+```
+
+- Always pass `--user "$(id -u):$(id -g)"` — prevents root-owned files on the host mount.
+- .NET: also mount `$RALPH_ROOT/ralph-specs/resources/nuget.config` and forward `NUGET_PRIVATE_FEED_URL` and `PROGET_DOTNET_TOKEN` env vars. See `.NET` rules for the exact pattern.
+- Prefer `docker compose run <svc> <cmd>` when a compose file exists (compose services should reference the same per-project image).
+- Do NOT use raw base images (`node:20`, `python:3.11`) directly — always use the per-project image to ensure certs are available.
 {{HOST_MODE_NOTE}}
 {{SIDECAR_MODE_NOTE}}
 

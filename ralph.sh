@@ -1104,6 +1104,18 @@ main() {
     set +a
     echo "[Ralph] Loaded .env from $TARGET_REPO_ROOT/.env" >&2
   fi
+  # Load private org overlay (cert URLs, private feeds) if present.
+  # Silent no-op when absent so the public runner works out of the box.
+  local private_env="$HOME/.config/ralph-private/org-values.env"
+  if [ -f "$private_env" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$private_env"
+    set +a
+    local loaded_vars
+    loaded_vars=$(grep -E '^[A-Z_]+=' "$private_env" 2>/dev/null | sed 's/#.*//' | grep -E '^[A-Z_]+=' | cut -d= -f1 | tr '\n' ' ')
+    echo "[Ralph] Loaded private org overlay ($private_env): $loaded_vars" >&2
+  fi
   require_runner_specs_dir || true
   require_agents_file || true
   require_prompt_file || true
