@@ -5,3 +5,5 @@
 The `nuget.config` at `$RALPH_ROOT/ralph-specs/resources/nuget.config` uses env var placeholders — if `NUGET_PRIVATE_FEED_URL` is empty the private feed entry is a no-op and builds fall back to nuget.org. Always mount it.
 
 See the .NET rules for the exact `docker run` and `docker-compose.yml` patterns.
+
+**For `docker build` (image builds), mounting does not work.** Use BuildKit secrets: pass the ProGet token via `--secret id=proget_token,env=PROGET_DOTNET_TOKEN` and consume it inside a single `RUN --mount=type=secret,id=proget_token ... dotnet restore` so the token never enters an image layer. Copy `nuget.config` into the build context and make sure the cert-install block runs **before** `dotnet restore`. Full pattern (Dockerfile, `docker build`, and `compose build`) is in the .NET rules under "`docker build` with private NuGet feed".
