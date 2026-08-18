@@ -96,8 +96,9 @@ parse_args() {
         shift
         ;;
       --host-mode)
-        HOST_MODE=true
-        shift
+        echo "[Ralph][error] --host-mode is disabled. All runtime commands must run in containers." >&2
+        echo "[Ralph]         Set up Docker/Podman and re-run without --host-mode." >&2
+        exit 2
         ;;
       --sidecar)
         SIDECAR_MODE=true
@@ -334,12 +335,6 @@ build_static_prompt() {
     done <<< "$rules_files"
   fi
 
-  # Host mode note injection
-  local host_mode_note=""
-  if [ "$HOST_MODE" = true ]; then
-    host_mode_note="**Host mode is active.** You may run tools, tests, and builds directly on the host without containers. Container wrapping is not required this session."
-  fi
-
   # Sidecar mode note injection
   local sidecar_mode_note=""
   if [ "$SIDECAR_MODE" = true ]; then
@@ -347,10 +342,7 @@ build_static_prompt() {
   fi
 
   # Assemble static prompt: agents identity (thin) + prompt directive + rules
-  # The prompt.md has {{HOST_MODE_NOTE}} and {{SIDECAR_MODE_NOTE}} placeholders.
-  # Use perl to avoid bash ${//} issues with & and \ in replacement strings.
-  prompt_block=$(HOST_MODE_NOTE="$host_mode_note" perl -0777 -pe \
-    's/\Q{{HOST_MODE_NOTE}}\E/$ENV{HOST_MODE_NOTE}/g' <<< "$prompt_block")
+  # The prompt.md has {{SIDECAR_MODE_NOTE}} placeholder.
   prompt_block=$(SIDECAR_MODE_NOTE="$sidecar_mode_note" perl -0777 -pe \
     's/\Q{{SIDECAR_MODE_NOTE}}\E/$ENV{SIDECAR_MODE_NOTE}/g' <<< "$prompt_block")
 
@@ -390,6 +382,87 @@ build_static_prompt() {
     's/\Q{{CERT_RULES}}\E/$ENV{CERT_RULES}/g' <<< "$prompt_block")
   prompt_block=$(NUGET_RULES="$nuget_rules_content" perl -0777 -pe \
     's/\Q{{NUGET_RULES}}\E/$ENV{NUGET_RULES}/g' <<< "$prompt_block")
+
+  # Language-gated blocks: strip {{#IF_LANG}}...{{/IF_LANG}} sections whose language isn't present.
+  # Detect languages in target repo.
+  local has_node_lang=false has_python_lang=false has_dotnet_lang=false
+  [ -f "$TARGET_REPO_ROOT/package.json" ] && has_node_lang=true
+  if [ -f "$TARGET_REPO_ROOT/pyproject.toml" ] || [ -f "$TARGET_REPO_ROOT/requirements.txt" ] || \
+     [ -f "$TARGET_REPO_ROOT/setup.py" ] || [ -f "$TARGET_REPO_ROOT/Pipfile" ]; then
+    has_python_lang=true
+  fi
+  if compgen -G "$TARGET_REPO_ROOT/*.sln" >/dev/null 2>&1 || \
+     compgen -G "$TARGET_REPO_ROOT/*.csproj" >/dev/null 2>&1 || \
+     find "$TARGET_REPO_ROOT" -maxdepth 4 -name "*.csproj" -print -quit 2>/dev/null | grep -q .; then
+    has_dotnet_lang=true
+  fi
+
+  # If no language detected, keep all blocks (safe fallback for scaffold scenarios).
+  local keep_all=false
+  if ! $has_node_lang && ! $has_python_lang && ! $has_dotnet_lang; then
+    keep_all=true
+    echo "[Ralph] No language detected; keeping all language-gated prompt blocks." >&2
+  fi
+
+  strip_or_keep_block() {
+    local lang="$1" keep="$2" content="$3"
+    if [ "$keep" = true ]; then
+      # Strip only the markers, keep content
+      LANG_TAG="$lang" perl -0777 -pe 's/\{\{#IF_\Q$ENV{LANG_TAG}\E\}\}\n?//g; s/\{\{\/IF_\Q$ENV{LANG_TAG}\E\}\}\n?//g' <<< "$content"
+    else
+      # Remove entire block including markers
+      LANG_TAG="$lang" perl -0777 -pe 's/\{\{#IF_\Q$ENV{LANG_TAG}\E\}\}.*?\{\{\/IF_\Q$ENV{LANG_TAG}\E\}\}\n?//gs' <<< "$content"
+    fi
+  }
+
+  keep_node=false; keep_python=false; keep_dotnet=false
+  if [ "$keep_all" = true ]; then
+    keep_node=true; keep_python=true; keep_dotnet=true
+  else
+    $has_node_lang   && keep_node=true
+    $has_python_lang && keep_python=true
+    $has_dotnet_lang && keep_dotnet=true
+  fi
+
+  prompt_block=$(strip_or_keep_block "NODE"   "$keep_node"   "$prompt_block")
+  prompt_block=$(strip_or_keep_block "PYTHON" "$keep_python" "$prompt_block")
+  prompt_block=$(strip_or_keep_block "DOTNET" "$keep_dotnet" "$prompt_block")
+
+  if [ "$keep_all" = false ]; then
+    local langs=""
+    $has_node_lang && langs="$langs node"
+    $has_python_lang && langs="$langs python"
+    $has_dotnet_lang && langs="$langs dotnet"
+    echo "[Ralph] Language-gated prompt blocks kept for:${langs}" >&2
+  fi
+
+  # Extracted-section refs (short summary + optional file path). Agent reads the
+  # file only when it actually needs the full content — minimal cost when unused.
+  local eh_ref browser_ref
+  local eh_file="$RALPH_ROOT/ralph-specs/error-handling.md"
+  local browser_file="$RALPH_ROOT/ralph-specs/browser-verification.md"
+
+  if [ -f "$eh_file" ]; then
+    eh_ref="Full decision table with all exit cases: read \`$eh_file\` only if the summary above is insufficient for the current situation."
+  else
+    eh_ref=""
+  fi
+
+  # Browser verification: only reference the file if any task in tasks.json
+  # mentions a browser-related AC. Matches "dev-browser" or "browser" (case-insensitive)
+  # to catch variant phrasings.
+  local tasks_file="$TARGET_REPO_ROOT/.ralph/tasks.json"
+  if [ -f "$tasks_file" ] && grep -qiE "dev-browser|browser" "$tasks_file" 2>/dev/null; then
+    browser_ref="Browser AC present in this PRD. Read \`$browser_file\` for the exact handling pattern (dev-browser skill vs. manual verification block + STOP)."
+    echo "[Ralph] Browser verification reference included (browser AC detected)" >&2
+  else
+    browser_ref="(No browser ACs in this PRD — section omitted.)"
+  fi
+
+  prompt_block=$(EH_REF="$eh_ref" perl -0777 -pe \
+    's/\Q{{ERROR_HANDLING_REF}}\E/$ENV{EH_REF}/g' <<< "$prompt_block")
+  prompt_block=$(BROWSER_REF="$browser_ref" perl -0777 -pe \
+    's/\Q{{BROWSER_VERIFICATION_REF}}\E/$ENV{BROWSER_REF}/g' <<< "$prompt_block")
 
   # Assemble static prompt: prompt directive + rules (agents_block excluded per Expert #3/#4 review)
   STATIC_PROMPT="$(printf "%s\n%s" "$prompt_block" "$rules_block")"
