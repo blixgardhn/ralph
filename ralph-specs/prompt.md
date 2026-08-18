@@ -116,12 +116,37 @@ Verification is a hard gate for commit, but the strategy is designed to minimize
 
 ### Output handling (avoid token bloat)
 
-- If test/build output exceeds ~2000 lines or ~150KB, **do not paste it into your thinking or the progress log**. Redirect to `.ralph/last-verify.log` and reference the file path in the progress entry.
-  ```bash
-  docker run --rm -v "$PWD":/work -w /work --user "$(id -u):$(id -g)" "$IMG" \
-    npm test 2>&1 | tee .ralph/last-verify.log | tail -50
-  ```
-- On failure, grep the log for the failing test name and error location; do not re-read the entire log.
+**Default to silent-on-pass.** Run tests with all output redirected to a log; only surface output when tests fail. This is the single biggest cost lever — a passing test suite should return ~1 line to your context, not hundreds.
+
+Canonical pattern (adapt the test command per language):
+
+```bash
+# Runs tests; on pass prints "PASS <suite>" only; on fail prints tail(50) + log path.
+mkdir -p .ralph
+if docker run --rm -v "$PWD":/work -w /work --user "$(id -u):$(id -g)" "$IMG" \
+     <TEST_CMD> >.ralph/last-verify.log 2>&1; then
+  echo "PASS <suite-name>"
+else
+  echo "FAIL <suite-name> — tail:"; tail -50 .ralph/last-verify.log
+  echo "Full log: .ralph/last-verify.log"
+fi
+```
+
+- **Never** pipe test output through `tee` to your terminal on success. The log file is enough.
+- On failure, read `.ralph/last-verify.log` with `grep` for the failing test name; do **not** cat the whole file.
+- If a test framework has a quiet flag (`--reporter=dot`, `-q`, `--nologo --verbosity=quiet`), use it — even the log gets smaller.
+
+### Setup cost (avoid repeat installs / container spins)
+
+Every extra `docker run` and every re-install of dependencies costs iteration time and tokens (agent waits, reads output).
+
+- **Cache dependency volumes.** Mount persistent named volumes for package caches so installs are near-instant on repeat runs:
+{{#IF_NODE}}  - Node: `-v ralph-node-modules-$(basename "$PWD"):/work/node_modules` (or use pnpm store cache).{{/IF_NODE}}
+{{#IF_PYTHON}}  - Python: `-v ralph-pip-cache:/root/.cache/pip` (or venv volume).{{/IF_PYTHON}}
+{{#IF_DOTNET}}  - .NET: `-v ralph-nuget-cache:/root/.nuget/packages`.{{/IF_DOTNET}}
+- **Reuse one container per iteration.** If sidecar mode is active, use `docker exec <sidecar> <cmd>` instead of `docker run --rm` for every command — no cold start per command.
+- **Skip `install` when lockfile unchanged.** Before running deps install, check `git diff --name-only HEAD~1 -- <lockfile>` — if empty and `node_modules`/venv/packages already exist, skip install entirely.
+- **Do not rebuild the per-project image** if it already exists (`docker image inspect`). This check is already in the §Containers pattern — do not remove it.
 
 ### Fix loop discipline
 
