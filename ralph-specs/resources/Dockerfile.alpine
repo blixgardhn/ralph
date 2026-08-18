@@ -1,0 +1,36 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# Alpine variant of the corporate cert-install pattern.
+# To use corporate CA certificates behind a proxy, set these build args:
+#   --build-arg PROXY_CERT_URL=http://pki.example.com/proxy.cer
+#   --build-arg ISSUING_CA_CERT_URL=http://pki.example.com/IssuingCA.pem.cer
+#   --build-arg ROOT_CA_CERT_URL=http://pki.example.com/RootCA.pem.cer
+# Leave unset to skip certificate installation.
+ARG PROXY_CERT_URL=""
+ARG ISSUING_CA_CERT_URL=""
+ARG ROOT_CA_CERT_URL=""
+
+RUN set -e; \
+    if [ -n "$PROXY_CERT_URL" ] || [ -n "$ROOT_CA_CERT_URL" ] || [ -n "$ISSUING_CA_CERT_URL" ]; then \
+      echo "Installing proxy/CA certificates (Alpine)..."; \
+      # Some corp proxies MITM https to the Alpine mirror; fall back to http so
+      # the initial ca-certificates install can succeed before certs are trusted.
+      sed -i 's|https://|http://|g' /etc/apk/repositories; \
+      apk add --no-cache ca-certificates curl bash git; \
+      cd /usr/local/share/ca-certificates; \
+      [ -n "$PROXY_CERT_URL" ] && curl --noproxy '*' -fsSLO "$PROXY_CERT_URL" && mv "$(basename "$PROXY_CERT_URL")" proxy.crt || true; \
+      [ -n "$ISSUING_CA_CERT_URL" ] && curl --noproxy '*' -fsSLO "$ISSUING_CA_CERT_URL" && mv "$(basename "$ISSUING_CA_CERT_URL")" issuing-ca.crt || true; \
+      [ -n "$ROOT_CA_CERT_URL" ] && curl --noproxy '*' -fsSLO "$ROOT_CA_CERT_URL" && mv "$(basename "$ROOT_CA_CERT_URL")" root-ca.crt || true; \
+      update-ca-certificates; \
+      echo "=== CA certificates installed (Alpine) ==="; \
+    else \
+      apk add --no-cache bash curl git ca-certificates; \
+    fi; \
+    curl -fsSL https://opencode.ai/install | bash; \
+    adduser -D -h /home/opencode opencode; \
+    mkdir -p /home/opencode/.config/opencode; \
+    chown -R opencode:opencode /home/opencode
+
+USER opencode
+WORKDIR /app

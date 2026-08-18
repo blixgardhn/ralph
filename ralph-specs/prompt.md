@@ -54,6 +54,8 @@ fi
 
 If `PROXY_CERT_URL` is empty, the cert-install block in the template is a safe no-op — builds work without a corporate proxy.
 
+**Alpine base images:** if `BASE_IMAGE` contains `-alpine`, use `Dockerfile.alpine` instead of `Dockerfile.template`. Same build args, but uses `apk` and applies the https→http repository workaround needed when the corporate proxy MITMs the Alpine mirror.
+
 ### Running commands
 
 **Every runtime command** must use the per-project image:
