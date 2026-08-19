@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Lean AI loop
-# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [--cheap-model <model>] [--strong-model <model>] [--cheap-max-context <tokens>] [--strong-max-context <tokens>] [--host-mode] [--sidecar] [--target-repo path] [max_iterations]
+# Usage: ./ralph.sh [--tool opencode|amp|claude] [--opencode-model <model>] [--cheap-model <model>] [--strong-model <model>] [--cheap-max-context <tokens>] [--strong-max-context <tokens>] [--sidecar|--no-sidecar] [--stop-sidecars-on-exit] [--target-repo path] [max_iterations]
 # Orchestrates short agent runs driven by prompt.md and tasks.json, archiving old runs when the PRD changes.
 
 set -euo pipefail
@@ -8,7 +8,15 @@ set -euo pipefail
 TOOL="opencode"
 MAX_ITERATIONS=30
 HOST_MODE=false
+# Sidecar mode: long-lived per-project containers reused across iterations.
+# Auto-enabled when Docker is available (see main()); set --no-sidecar to
+# disable, or --sidecar to force on.
 SIDECAR_MODE=false
+SIDECAR_MODE_EXPLICIT=false
+# Persist sidecars across ralph.sh sessions by default so the second and
+# subsequent runs on the same repo start warm. Set --stop-sidecars-on-exit
+# to opt into cleanup.
+SIDECAR_STOP_ON_EXIT=false
 OPENCODE_MODEL="${OPENCODE_MODEL:-}"
 OPENCODE_MODEL_CHEAP="${OPENCODE_MODEL_CHEAP:-}"
 OPENCODE_MODEL_STRONG="${OPENCODE_MODEL_STRONG:-}"
@@ -102,6 +110,16 @@ parse_args() {
         ;;
       --sidecar)
         SIDECAR_MODE=true
+        SIDECAR_MODE_EXPLICIT=true
+        shift
+        ;;
+      --no-sidecar)
+        SIDECAR_MODE=false
+        SIDECAR_MODE_EXPLICIT=true
+        shift
+        ;;
+      --stop-sidecars-on-exit)
+        SIDECAR_STOP_ON_EXIT=true
         shift
         ;;
       *)
@@ -672,95 +690,226 @@ inline_keyfiles() {
 }
 
 # ── Sidecar containers ──────────────────────────────────────────────
-# Long-lived containers for reuse across iterations (--sidecar mode).
+# Long-lived per-repo containers reused across iterations AND across
+# ralph.sh sessions. Named deterministically from the target repo path so
+# repeated sessions reuse the same warm containers.
 SIDECAR_IDS=()
+SIDECAR_NAMES=()
+
+# Compute a stable short hash of the target repo path for sidecar names.
+sidecar_repo_tag() {
+  local abs
+  abs=$(cd "$TARGET_REPO_ROOT" 2>/dev/null && pwd || echo "$TARGET_REPO_ROOT")
+  printf '%s' "$abs" | sha1sum | awk '{print substr($1, 1, 10)}'
+}
+
+# Auto-enable sidecar mode when Docker is available and the user didn't say
+# otherwise. Sidecars slash cold-start cost across iterations; there is no
+# downside for the default case (single-user local iteration).
+auto_enable_sidecar_mode() {
+  if [ "$SIDECAR_MODE_EXPLICIT" = true ]; then
+    return
+  fi
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "[Ralph][sidecar] Docker not found; sidecar mode disabled." >&2
+    return
+  fi
+  if ! docker info >/dev/null 2>&1; then
+    echo "[Ralph][sidecar] Docker not reachable; sidecar mode disabled." >&2
+    return
+  fi
+  SIDECAR_MODE=true
+  echo "[Ralph][sidecar] Sidecar mode auto-enabled (Docker available). Use --no-sidecar to disable." >&2
+}
+
+# Start a single sidecar if not already running.
+# Args: name image [extra_docker_args]
+# Sets a global RALPH_SIDECAR_<UPPER> to the name on success.
+_start_sidecar_if_needed() {
+  local name="$1" image="$2" export_var="$3"
+  shift 3
+  local extra=("$@")
+
+  # Reuse if already running.
+  local existing_state
+  existing_state=$(docker inspect --format='{{.State.Running}}' "$name" 2>/dev/null || echo "missing")
+  if [ "$existing_state" = "true" ]; then
+    echo "[Ralph][sidecar] Reusing running $name" >&2
+    SIDECAR_NAMES+=("$name")
+    export "$export_var=$name"
+    return 0
+  fi
+
+  # If it exists but is stopped, start it.
+  if [ "$existing_state" = "false" ]; then
+    if docker start "$name" >/dev/null 2>&1; then
+      echo "[Ralph][sidecar] Restarted stopped $name" >&2
+      SIDECAR_NAMES+=("$name")
+      export "$export_var=$name"
+      return 0
+    fi
+    # Corrupted; remove and recreate below.
+    docker rm -f "$name" >/dev/null 2>&1 || true
+  fi
+
+  # Fresh create.
+  if docker run -d --name "$name" --memory=4g --cpus=2 \
+      -v "$TARGET_REPO_ROOT":/work -w /work \
+      "${extra[@]}" \
+      "$image" sleep infinity >/dev/null 2>&1; then
+    echo "[Ralph][sidecar] Started $name ($image)" >&2
+    SIDECAR_NAMES+=("$name")
+    SIDECAR_IDS+=("$name")   # track for optional cleanup
+    export "$export_var=$name"
+    return 0
+  fi
+  echo "[Ralph][sidecar] Failed to start $name" >&2
+  return 1
+}
+
+# Fire-and-forget cache warming inside a sidecar.
+# Runs in background; the first iteration may still race it, but subsequent
+# iterations start warm. Failures are silent — cache warming is best-effort.
+_warm_sidecar_cache() {
+  local name="$1" cmd="$2"
+  ( docker exec "$name" bash -lc "$cmd" >/dev/null 2>&1 || true ) &
+}
 
 launch_sidecars() {
   if [ "$SIDECAR_MODE" != true ]; then
     return
   fi
 
-  echo "[Ralph][sidecar] Launching sidecar containers..." >&2
+  echo "[Ralph][sidecar] Preparing sidecars for $TARGET_REPO_ROOT..." >&2
 
   local has_node=false has_python=false has_dotnet=false
-
   [ -f "$TARGET_REPO_ROOT/package.json" ] && has_node=true
-  ([ -f "$TARGET_REPO_ROOT/pyproject.toml" ] || [ -f "$TARGET_REPO_ROOT/requirements.txt" ]) && has_python=true
-  (compgen -G "$TARGET_REPO_ROOT/*.sln" >/dev/null 2>&1 || find "$TARGET_REPO_ROOT" -maxdepth 4 -name "*.csproj" -print -quit 2>/dev/null | grep -q .) && has_dotnet=true
+  if [ -f "$TARGET_REPO_ROOT/pyproject.toml" ] || [ -f "$TARGET_REPO_ROOT/requirements.txt" ]; then
+    has_python=true
+  fi
+  if compgen -G "$TARGET_REPO_ROOT/*.sln" >/dev/null 2>&1 || \
+     find "$TARGET_REPO_ROOT" -maxdepth 4 -name "*.csproj" -print -quit 2>/dev/null | grep -q .; then
+    has_dotnet=true
+  fi
 
+  local tag
+  tag=$(sidecar_repo_tag)
+
+  # Launch all sidecars in parallel so start-up is bounded by the slowest,
+  # not the sum. Wait for all subshells before moving on.
+  local pids=()
   if [ "$has_node" = true ]; then
-    local id
-    id=$(docker run -d --name "ralph-sidecar-node-$$" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work node:20 sleep infinity 2>/dev/null || true)
-    if [ -n "$id" ]; then
-      SIDECAR_IDS+=("$id")
-      export RALPH_SIDECAR_NODE="ralph-sidecar-node-$$"
-      echo "[Ralph][sidecar] Node sidecar: $RALPH_SIDECAR_NODE" >&2
-    fi
+    ( _start_sidecar_if_needed "ralph-sidecar-node-$tag" "node:20" "RALPH_SIDECAR_NODE" \
+        -v "ralph-cache-node-$tag:/work/node_modules" ) & pids+=($!)
   fi
-
   if [ "$has_python" = true ]; then
-    local id
-    id=$(docker run -d --name "ralph-sidecar-python-$$" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work python:3.11 sleep infinity 2>/dev/null || true)
-    if [ -n "$id" ]; then
-      SIDECAR_IDS+=("$id")
-      export RALPH_SIDECAR_PYTHON="ralph-sidecar-python-$$"
-      echo "[Ralph][sidecar] Python sidecar: $RALPH_SIDECAR_PYTHON" >&2
-    fi
+    ( _start_sidecar_if_needed "ralph-sidecar-python-$tag" "python:3.11" "RALPH_SIDECAR_PYTHON" \
+        -v "ralph-cache-pip-$tag:/root/.cache/pip" ) & pids+=($!)
   fi
-
   if [ "$has_dotnet" = true ]; then
-    local id
-    id=$(docker run -d --name "ralph-sidecar-dotnet-$$" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work mcr.microsoft.com/dotnet/sdk:8.0 sleep infinity 2>/dev/null || true)
-    if [ -n "$id" ]; then
-      SIDECAR_IDS+=("$id")
-      export RALPH_SIDECAR_DOTNET="ralph-sidecar-dotnet-$$"
-      echo "[Ralph][sidecar] .NET sidecar: $RALPH_SIDECAR_DOTNET" >&2
+    ( _start_sidecar_if_needed "ralph-sidecar-dotnet-$tag" "mcr.microsoft.com/dotnet/sdk:8.0" "RALPH_SIDECAR_DOTNET" \
+        -v "ralph-cache-nuget-$tag:/root/.nuget/packages" ) & pids+=($!)
+  fi
+
+  # Wait for all sidecar starts. Note: `export` inside a background subshell
+  # does not propagate; the sidecar names are stable per (repo, language) so
+  # we re-derive them below rather than rely on the subshell exports.
+  for pid in "${pids[@]}"; do
+    wait "$pid" 2>/dev/null || true
+  done
+
+  # Re-derive names in the parent shell (subshell exports were lost).
+  if [ "$has_node" = true ]; then
+    if docker inspect --format='{{.State.Running}}' "ralph-sidecar-node-$tag" 2>/dev/null | grep -q true; then
+      export RALPH_SIDECAR_NODE="ralph-sidecar-node-$tag"
+      SIDECAR_NAMES+=("$RALPH_SIDECAR_NODE")
+    fi
+  fi
+  if [ "$has_python" = true ]; then
+    if docker inspect --format='{{.State.Running}}' "ralph-sidecar-python-$tag" 2>/dev/null | grep -q true; then
+      export RALPH_SIDECAR_PYTHON="ralph-sidecar-python-$tag"
+      SIDECAR_NAMES+=("$RALPH_SIDECAR_PYTHON")
+    fi
+  fi
+  if [ "$has_dotnet" = true ]; then
+    if docker inspect --format='{{.State.Running}}' "ralph-sidecar-dotnet-$tag" 2>/dev/null | grep -q true; then
+      export RALPH_SIDECAR_DOTNET="ralph-sidecar-dotnet-$tag"
+      SIDECAR_NAMES+=("$RALPH_SIDECAR_DOTNET")
     fi
   fi
 
-  if [ ${#SIDECAR_IDS[@]} -eq 0 ]; then
-    echo "[Ralph][sidecar] No runtimes detected; no sidecars launched." >&2
-  fi
-}
-
-cleanup_sidecars() {
-  if [ ${#SIDECAR_IDS[@]} -eq 0 ]; then
+  if [ ${#SIDECAR_NAMES[@]} -eq 0 ]; then
+    echo "[Ralph][sidecar] No sidecars running." >&2
     return
   fi
-  echo "[Ralph][sidecar] Cleaning up sidecar containers..." >&2
-  for id in "${SIDECAR_IDS[@]}"; do
-    docker rm -f "$id" >/dev/null 2>&1 || true
+
+  # Background dependency-cache warming. Best-effort; the first iteration may
+  # start before warming completes, but subsequent iterations reuse the cache.
+  if [ -n "$RALPH_SIDECAR_NODE" ] && [ -f "$TARGET_REPO_ROOT/package-lock.json" ]; then
+    _warm_sidecar_cache "$RALPH_SIDECAR_NODE" "npm ci --prefer-offline --no-audit --progress=false"
+  elif [ -n "$RALPH_SIDECAR_NODE" ] && [ -f "$TARGET_REPO_ROOT/package.json" ]; then
+    _warm_sidecar_cache "$RALPH_SIDECAR_NODE" "npm install --prefer-offline --no-audit --progress=false"
+  fi
+  if [ -n "$RALPH_SIDECAR_PYTHON" ] && [ -f "$TARGET_REPO_ROOT/requirements.txt" ]; then
+    _warm_sidecar_cache "$RALPH_SIDECAR_PYTHON" "pip install --disable-pip-version-check -q -r requirements.txt"
+  elif [ -n "$RALPH_SIDECAR_PYTHON" ] && [ -f "$TARGET_REPO_ROOT/pyproject.toml" ]; then
+    _warm_sidecar_cache "$RALPH_SIDECAR_PYTHON" "pip install --disable-pip-version-check -q -e . 2>/dev/null || pip install --disable-pip-version-check -q ."
+  fi
+  if [ -n "$RALPH_SIDECAR_DOTNET" ]; then
+    _warm_sidecar_cache "$RALPH_SIDECAR_DOTNET" "dotnet restore --nologo"
+  fi
+
+  echo "[Ralph][sidecar] ${#SIDECAR_NAMES[@]} sidecar(s) ready. Cache warming running in background." >&2
+}
+
+# Cleanup sidecars ONLY when the user opted in with --stop-sidecars-on-exit.
+# Default is to persist so the next ralph.sh session on this repo starts
+# warm (a rerun otherwise pays ~10-30s of docker/dep startup per language).
+cleanup_sidecars() {
+  if [ "$SIDECAR_STOP_ON_EXIT" != true ]; then
+    if [ ${#SIDECAR_NAMES[@]} -gt 0 ]; then
+      echo "[Ralph][sidecar] Leaving ${#SIDECAR_NAMES[@]} sidecar(s) running for next session. Use --stop-sidecars-on-exit to auto-remove." >&2
+    fi
+    return
+  fi
+  if [ ${#SIDECAR_NAMES[@]} -eq 0 ]; then
+    return
+  fi
+  echo "[Ralph][sidecar] Removing sidecar containers..." >&2
+  for name in "${SIDECAR_NAMES[@]}"; do
+    docker rm -f "$name" >/dev/null 2>&1 || true
   done
+  SIDECAR_NAMES=()
   SIDECAR_IDS=()
 }
 
 # Check sidecar containers are still running; restart any that died.
 check_sidecars() {
-  if [ "$SIDECAR_MODE" != true ] || [ ${#SIDECAR_IDS[@]} -eq 0 ]; then
+  if [ "$SIDECAR_MODE" != true ] || [ ${#SIDECAR_NAMES[@]} -eq 0 ]; then
     return
   fi
 
-  local new_ids=()
-  for id in "${SIDECAR_IDS[@]}"; do
-    if docker inspect --format='{{.State.Running}}' "$id" 2>/dev/null | grep -q "true"; then
-      new_ids+=("$id")
-    else
-      local name
-      name=$(docker inspect --format='{{.Name}}' "$id" 2>/dev/null | sed 's|^/||' || echo "$id")
-      echo "[Ralph][sidecar] Container $name died; restarting..." >&2
-      docker rm -f "$id" >/dev/null 2>&1 || true
-      # Restart with same name and config
-      local new_id
-      new_id=$(docker run -d --name "$name" --memory=4g --cpus=2 -v "$TARGET_REPO_ROOT":/work -w /work "${name##*-sidecar-}" sleep infinity 2>/dev/null || true)
-      if [ -n "$new_id" ]; then
-        new_ids+=("$new_id")
-        echo "[Ralph][sidecar] Restarted $name" >&2
-      else
-        echo "[Ralph][sidecar] Failed to restart $name" >&2
-      fi
+  local tag
+  tag=$(sidecar_repo_tag)
+
+  for name in "${SIDECAR_NAMES[@]}"; do
+    if docker inspect --format='{{.State.Running}}' "$name" 2>/dev/null | grep -q "true"; then
+      continue
     fi
+    echo "[Ralph][sidecar] Container $name died; restarting..." >&2
+    # Determine image from the name convention.
+    local image=""
+    case "$name" in
+      ralph-sidecar-node-*)   image="node:20" ;;
+      ralph-sidecar-python-*) image="python:3.11" ;;
+      ralph-sidecar-dotnet-*) image="mcr.microsoft.com/dotnet/sdk:8.0" ;;
+    esac
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    docker run -d --name "$name" --memory=4g --cpus=2 \
+      -v "$TARGET_REPO_ROOT":/work -w /work \
+      "$image" sleep infinity >/dev/null 2>&1 || \
+      echo "[Ralph][sidecar] Failed to restart $name" >&2
   done
-  SIDECAR_IDS=("${new_ids[@]}")
 }
 
 require_prompt_file() {
@@ -1376,7 +1525,9 @@ main() {
   if [ "$HOST_MODE" = true ]; then
     echo "[Ralph] Host mode active: containers not required for tooling." >&2
   fi
-  # Launch sidecar containers if --sidecar mode
+  # Auto-enable sidecar mode when Docker is available (opt-out via --no-sidecar)
+  auto_enable_sidecar_mode
+  # Launch sidecar containers (parallel start + background cache warming)
   launch_sidecars
   trap cleanup_sidecars EXIT
   # Verify the AI tool is reachable before burning full iterations
