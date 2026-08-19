@@ -560,13 +560,34 @@ resolve_iteration_model() {
     chosen_tier="cheap"; chosen_model="$OPENCODE_MODEL_CHEAP"
     echo "[Ralph][tier] Initial: cheap model (PRD-driven)" >&2
   else
-    # Heuristic fallback: strong if >=5 keyFiles OR ACs mention test/verify
+    # Heuristic fallback: strong only for genuinely complex tasks.
+    #
+    # Previous rule ("ACs mention test|verify") fired on nearly every task
+    # because stock ACs include "Typecheck passes" / "Tests pass". Analysis
+    # of ~46 real iterations showed cheap tier succeeding 8/9 times when
+    # used, so the old rule was silently forcing strong tier ~90% of the
+    # time despite cheap being adequate.
+    #
+    # New rule (any of):
+    #   - >=6 keyFiles (broad change surface), OR
+    #   - description/notes/ACs signal genuinely hard work: refactor,
+    #     migrate, redesign, algorithm, concurrency, performance, security,
+    #     architecture
+    #
+    # Boilerplate ACs like "Typecheck passes" / "Tests pass" no longer
+    # promote to strong on their own. Use .tier = "strong" in the PRD to
+    # force strong for tasks the heuristic can't detect.
     local use_strong=false
     if [ -n "$task_json" ] && [ "$task_json" != "{}" ] && command -v jq >/dev/null 2>&1; then
-      local key_files_count ac_has_test
+      local key_files_count complex_signal
       key_files_count=$(echo "$task_json" | jq '(.keyFiles // []) | length' 2>/dev/null || echo 0)
-      ac_has_test=$(echo "$task_json" | jq '(.acceptanceCriteria // []) | map(ascii_downcase) | any(test("test|verify"))' 2>/dev/null || echo "false")
-      if [ "$key_files_count" -ge 5 ] 2>/dev/null || [ "$ac_has_test" = "true" ]; then
+      complex_signal=$(echo "$task_json" | jq '
+        [(.title // ""), (.description // ""), (.implementationNotes // "")]
+        + ((.acceptanceCriteria // []))
+        | map(ascii_downcase)
+        | any(test("refactor|migrat|redesign|algorithm|concurren|performance|security|architecture"))
+      ' 2>/dev/null || echo "false")
+      if [ "$key_files_count" -ge 6 ] 2>/dev/null || [ "$complex_signal" = "true" ]; then
         use_strong=true
       fi
     fi
@@ -1225,10 +1246,24 @@ run_iteration() {
     remaining_tasks=0
   fi
   completed_tasks=$(compute_completed_tasks "$TOTAL_TASKS" "$remaining_tasks")
-  # Determine outcome for cost log
+  # Determine outcome for cost log.
+  # An iteration counts as complete when EITHER the agent emitted
+  # <promise>TASK_COMPLETE</promise> OR the task's passes field flipped to
+  # true on disk. Agents sometimes finish the work but forget the promise
+  # tag; treating that as completion gives accurate cost.jsonl telemetry.
+  # (The task-selection query at line ~934 already skips passes:true tasks,
+  # so this only affects logging, not loop behavior.)
   local iter_outcome="continued"
   if echo "$OUTPUT" | grep -q "<promise>TASK_COMPLETE</promise>"; then
     iter_outcome="task_complete"
+  elif command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ] && [ -n "$SELECTED_TASK_ID" ]; then
+    local outcome_passes
+    outcome_passes=$(jq -r --arg id "$SELECTED_TASK_ID" \
+      '(.tasks // [])[] | select(.id == $id) | .passes // false' "$PRD_FILE" 2>/dev/null || echo "false")
+    if [ "$outcome_passes" = "true" ]; then
+      iter_outcome="task_complete"
+      echo "[Ralph] Task $SELECTED_TASK_ID passes:true on disk despite missing TASK_COMPLETE tag; counted as complete." >&2
+    fi
   fi
   log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "$iter_outcome"
   echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
