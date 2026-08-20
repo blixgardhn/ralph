@@ -845,17 +845,17 @@ launch_sidecars() {
 
   # Background dependency-cache warming. Best-effort; the first iteration may
   # start before warming completes, but subsequent iterations reuse the cache.
-  if [ -n "$RALPH_SIDECAR_NODE" ] && [ -f "$TARGET_REPO_ROOT/package-lock.json" ]; then
+  if [ -n "${RALPH_SIDECAR_NODE:-}" ] && [ -f "$TARGET_REPO_ROOT/package-lock.json" ]; then
     _warm_sidecar_cache "$RALPH_SIDECAR_NODE" "npm ci --prefer-offline --no-audit --progress=false"
-  elif [ -n "$RALPH_SIDECAR_NODE" ] && [ -f "$TARGET_REPO_ROOT/package.json" ]; then
+  elif [ -n "${RALPH_SIDECAR_NODE:-}" ] && [ -f "$TARGET_REPO_ROOT/package.json" ]; then
     _warm_sidecar_cache "$RALPH_SIDECAR_NODE" "npm install --prefer-offline --no-audit --progress=false"
   fi
-  if [ -n "$RALPH_SIDECAR_PYTHON" ] && [ -f "$TARGET_REPO_ROOT/requirements.txt" ]; then
+  if [ -n "${RALPH_SIDECAR_PYTHON:-}" ] && [ -f "$TARGET_REPO_ROOT/requirements.txt" ]; then
     _warm_sidecar_cache "$RALPH_SIDECAR_PYTHON" "pip install --disable-pip-version-check -q -r requirements.txt"
-  elif [ -n "$RALPH_SIDECAR_PYTHON" ] && [ -f "$TARGET_REPO_ROOT/pyproject.toml" ]; then
+  elif [ -n "${RALPH_SIDECAR_PYTHON:-}" ] && [ -f "$TARGET_REPO_ROOT/pyproject.toml" ]; then
     _warm_sidecar_cache "$RALPH_SIDECAR_PYTHON" "pip install --disable-pip-version-check -q -e . 2>/dev/null || pip install --disable-pip-version-check -q ."
   fi
-  if [ -n "$RALPH_SIDECAR_DOTNET" ]; then
+  if [ -n "${RALPH_SIDECAR_DOTNET:-}" ]; then
     _warm_sidecar_cache "$RALPH_SIDECAR_DOTNET" "dotnet restore --nologo"
   fi
 
