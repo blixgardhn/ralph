@@ -304,7 +304,7 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 
 ## Post-Completion Notification
 
-After saving the PRD markdown and `.ralph/tasks.json`, send a Pushover notification to alert the user that the PRD is ready for review. Run this Bash command:
+After saving the PRD markdown and `.ralph/tasks.json`, send a Pushover notification to alert the user that the PRD is ready for review. Pushover calls are cheap (single HTTP request, no token cost) and are considered acceptable at milestone boundaries — do not skip this step for cost reasons. Run this Bash command:
 
 ```bash
 RALPH_ROOT="${RALPH_ROOT:-$(cd "$(dirname "$(find ../ralph -name ralph.sh -maxdepth 1 2>/dev/null | head -1)" 2>/dev/null)" && pwd)}"
