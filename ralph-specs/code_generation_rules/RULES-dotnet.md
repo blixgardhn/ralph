@@ -13,7 +13,7 @@ See `RULES.md` for shared guidance (language, development style, safety, observa
 - Keep dependency injection registrations consistent and scoped appropriately; avoid service locator patterns.
 - Centralize configuration via `IOptions` and environment-specific settings; avoid hardcoded environment flags.
 - Favor analyzers and formatting via `dotnet format` (verify-only unless the repo expects auto-fix) or repository standards; do not disable rules broadly.
-- Use structured logging with `ILogger<T>` and include meaningful event/context data.
+- Use structured logging with `ILogger<T>` and include meaningful event/context data. See "Log-level discipline" below.
 - Prefer minimal, well-typed DTOs for API boundaries; avoid exposing EF/Core entities directly.
 - Solution layout conventions: keep production code under `src/`, tests under `tests/`, and align project names with bounded contexts or services.
 - Reusable code may be placed in library projects within the solution.
@@ -129,6 +129,29 @@ Build with: `DOCKER_BUILDKIT=1 docker compose build`.
 - `no such file or directory: /run/secrets/proget_token` → BuildKit not enabled, or `--secret` flag omitted. Set `DOCKER_BUILDKIT=1`.
 - Token shows up in `docker history <image>` → someone used `ARG PROGET_DOTNET_TOKEN` / `ENV PROGET_DOTNET_TOKEN` instead of the secret mount. Switch to the pattern above and rebuild; consider the leaked image compromised if it was pushed.
 - Works locally, fails in CI → CI runner is missing the `PROGET_DOTNET_TOKEN` secret in its environment, or uses an older Docker without BuildKit.
+
+### Log-level discipline
+
+Apply log levels per the org standard (`int-apps-k8s/docs/LOGGING.md`, based on Microsoft's `LogLevel` enum). Misusing levels floods production logs and obscures real issues. The common failure mode is emitting debug-detail messages at `Information`, drowning genuine operational signal.
+
+| Level | Use for | NOT for |
+|-------|---------|---------|
+| Critical | Unrecoverable crash requiring immediate attention | — |
+| Error | Current execution flow stopped due to failure | Expected/handled conditions |
+| Warning | Abnormal/unexpected events that don't stop execution | Normal control flow |
+| Information | Business-meaningful milestones (job started, job completed, N records processed) | Per-item/per-row progress, method entry/exit, config dumps, validation traces |
+| Debug | Detailed diagnostic data useful during development | Anything expected to be visible in prod |
+
+Rules:
+- Prod defaults to `Warning` or `Information`. Never promote debug-detail messages to `Information` to make them visible in prod — lower the threshold in dev/test environments (`Logging:LogLevel:Default` = `Debug`) instead.
+- One `Information` log per logical operation boundary is enough (start, end, summary). Per-iteration, per-record, or per-branch detail is `Debug`.
+- Loops: log the aggregate at `Information` (e.g. `"Processed {Count} organizations"`), individual items at `Debug`.
+- Include structured context (`{JobId}`, `{RecordCount}`, `{Strategy}`) but not full payloads.
+- Never log sensitive data at any level.
+- Configure via standard .NET keys (`Logging:LogLevel:Default`, `Logging:LogLevel:<Namespace>`) or `Serilog:MinimumLevel:Default`. Do not hardcode.
+
+Quick self-check when adding an `Information` log: "Would an operator paging on this in prod be useful?" If no, it's `Debug`.
+
 ### ASP.NET Core architecture (guidelines, not dogma)
 - Use ASP.NET Core MVC conventions to organize functionality (Controllers, Views, Models).
 - Prefer clear domain models over generic key/value blobs.
