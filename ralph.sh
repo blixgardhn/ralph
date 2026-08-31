@@ -603,7 +603,7 @@ resolve_iteration_model() {
         [(.title // ""), (.description // ""), (.implementationNotes // "")]
         + ((.acceptanceCriteria // []))
         | map(ascii_downcase)
-        | any(test("refactor|migrat|redesign|algorithm|concurren|performance|security|architecture"))
+        | any(test("refactor|migrat|redesign|algorithm|concurren|performance|security|architecture|openiddict|oauth|oidc|jwks|signing key|options ?monitor|postconfigure|ipostconfigure|event ?handler|dependency injection|reflection|expression tree"))
       ' 2>/dev/null || echo "false")
       if [ "$key_files_count" -ge 6 ] 2>/dev/null || [ "$complex_signal" = "true" ]; then
         use_strong=true
@@ -730,14 +730,44 @@ _start_sidecar_if_needed() {
   shift 3
   local extra=("$@")
 
-  # Reuse if already running.
+  # Reuse if already running, unless the running container is missing an env
+  # var that we're now trying to inject (stale sidecar from an earlier run).
+  # This is the common case that silently breaks NuGet: sidecar was started
+  # before NUGET_PRIVATE_FEED_URL / PROGET_DOTNET_TOKEN were exported, so it
+  # keeps trying api.nuget.org and getting reset by the corp proxy.
   local existing_state
   existing_state=$(docker inspect --format='{{.State.Running}}' "$name" 2>/dev/null || echo "missing")
   if [ "$existing_state" = "true" ]; then
-    echo "[Ralph][sidecar] Reusing running $name" >&2
-    SIDECAR_NAMES+=("$name")
-    export "$export_var=$name"
-    return 0
+    local stale=false expected_env
+    for expected_env in "${extra[@]}"; do
+      case "$expected_env" in
+        -e)
+          continue
+          ;;
+        *=*)
+          local key="${expected_env%%=*}"
+          # Only enforce presence of NuGet/cert-critical vars; other vars are
+          # optional to re-check.
+          case "$key" in
+            NUGET_PRIVATE_FEED_URL|PROGET_DOTNET_TOKEN|PROXY_CERT_URL|ISSUING_CA_CERT_URL|ROOT_CA_CERT_URL)
+              if ! docker exec "$name" bash -c "[ -n \"\${$key:-}\" ]" >/dev/null 2>&1; then
+                stale=true
+                echo "[Ralph][sidecar] $name missing $key; recreating" >&2
+                break
+              fi
+              ;;
+          esac
+          ;;
+      esac
+    done
+    if [ "$stale" = true ]; then
+      docker rm -f "$name" >/dev/null 2>&1 || true
+    else
+      echo "[Ralph][sidecar] Reusing running $name" >&2
+      SIDECAR_NAMES+=("$name")
+      export "$export_var=$name"
+      return 0
+    fi
   fi
 
   # If it exists but is stopped, start it.
@@ -807,8 +837,24 @@ launch_sidecars() {
         -v "ralph-cache-pip-$tag:/root/.cache/pip" ) & pids+=($!)
   fi
   if [ "$has_dotnet" = true ]; then
+    # Forward NuGet feed + ProGet token + corporate cert URLs so `dotnet restore`
+    # inside the sidecar reaches the private feed instead of falling back to
+    # nuget.org (which usually resets the connection behind the corp proxy).
+    # Mount the shared nuget.config read-only so private-feed entries exist.
+    local dotnet_extra=(
+      -v "ralph-cache-nuget-$tag:/root/.nuget/packages"
+    )
+    if [ -f "$RALPH_ROOT/ralph-specs/resources/nuget.config" ]; then
+      dotnet_extra+=(-v "$RALPH_ROOT/ralph-specs/resources/nuget.config:/work/nuget.config:ro")
+    fi
+    [ -n "${NUGET_PRIVATE_FEED_URL:-}" ] && dotnet_extra+=(-e "NUGET_PRIVATE_FEED_URL=$NUGET_PRIVATE_FEED_URL")
+    [ -n "${PROGET_DOTNET_TOKEN:-}" ]    && dotnet_extra+=(-e "PROGET_DOTNET_TOKEN=$PROGET_DOTNET_TOKEN")
+    [ -n "${PROXY_CERT_URL:-}" ]         && dotnet_extra+=(-e "PROXY_CERT_URL=$PROXY_CERT_URL")
+    [ -n "${ISSUING_CA_CERT_URL:-}" ]    && dotnet_extra+=(-e "ISSUING_CA_CERT_URL=$ISSUING_CA_CERT_URL")
+    [ -n "${ROOT_CA_CERT_URL:-}" ]       && dotnet_extra+=(-e "ROOT_CA_CERT_URL=$ROOT_CA_CERT_URL")
+
     ( _start_sidecar_if_needed "ralph-sidecar-dotnet-$tag" "mcr.microsoft.com/dotnet/sdk:8.0" "RALPH_SIDECAR_DOTNET" \
-        -v "ralph-cache-nuget-$tag:/root/.nuget/packages" ) & pids+=($!)
+        "${dotnet_extra[@]}" ) & pids+=($!)
   fi
 
   # Wait for all sidecar starts. Note: `export` inside a background subshell
@@ -1370,6 +1416,24 @@ run_iteration() {
   fi
 
   record_suggestions "$iteration" "continued" "$OUTPUT"
+
+  # NuGet feed connectivity check. If the last verify log contains repeated
+  # "Connection reset by peer" errors against nuget.org, the container likely
+  # isn't seeing NUGET_PRIVATE_FEED_URL / PROGET_DOTNET_TOKEN. Warn loudly so
+  # the user doesn't burn 20+ minutes per iteration on doomed restores.
+  if [ -f "$TARGET_REPO_ROOT/.ralph/last-verify.log" ]; then
+    local nuget_resets
+    nuget_resets=$(grep -c "Connection reset by peer" "$TARGET_REPO_ROOT/.ralph/last-verify.log" 2>/dev/null || echo 0)
+    if [ "${nuget_resets:-0}" -ge 3 ] 2>/dev/null; then
+      echo "" >&2
+      echo "[Ralph][WARN] Detected $nuget_resets NuGet 'Connection reset by peer' errors in this iteration." >&2
+      echo "[Ralph][WARN] The container is likely hitting api.nuget.org instead of the private feed." >&2
+      echo "[Ralph][WARN] Verify on host: env | grep -E 'NUGET_PRIVATE_FEED_URL|PROGET_DOTNET_TOKEN'" >&2
+      echo "[Ralph][WARN] Also verify inside sidecar: docker exec \$RALPH_SIDECAR_DOTNET env | grep NUGET" >&2
+      echo "[Ralph][WARN] If missing, stop stale sidecars: docker rm -f \$(docker ps -aq --filter name=ralph-sidecar-dotnet)" >&2
+      echo "" >&2
+    fi
+  fi
 
   # Reset stuck-task counter if the agent signaled TASK_COMPLETE or the task
   # flipped to passes:true (covers cases where the agent completes but the
