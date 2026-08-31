@@ -138,6 +138,10 @@ fi
 - On failure, read `.ralph/last-verify.log` with `grep` for the failing test name; do **not** cat the whole file.
 - If a test framework has a quiet flag (`--reporter=dot`, `-q`, `--nologo --verbosity=quiet`), use it — even the log gets smaller.
 
+### Notifications (allowed)
+
+Pushover notifications via `$RALPH_ROOT/scripts/notify.sh` are cheap once per run (single HTTP call, no token cost to the agent). Use them at meaningful milestones (task complete, blocking error, PRD ready). Do not spam — one notification per iteration outcome at most.
+
 ### Setup cost (avoid repeat installs / container spins)
 
 Every extra `docker run` and every re-install of dependencies costs iteration time and tokens (agent waits, reads output).
