@@ -839,13 +839,21 @@ launch_sidecars() {
   if [ "$has_dotnet" = true ]; then
     # Forward NuGet feed + ProGet token + corporate cert URLs so `dotnet restore`
     # inside the sidecar reaches the private feed instead of falling back to
-    # nuget.org (which usually resets the connection behind the corp proxy).
-    # Mount the shared nuget.config read-only so private-feed entries exist.
+    # nuget.org (which the corporate proxy drops from containers).
+    # Mount nuget.config into the container. Prefer the target repo's own
+    # .ralph/nuget.config (typically <clear/> + ProGet-only, which forces all
+    # restore traffic through ProGet). Fall back to the shared runner copy
+    # only when the target repo hasn't provided its own — note that copy
+    # includes api.nuget.org, which will fail behind the corp proxy.
     local dotnet_extra=(
       -v "ralph-cache-nuget-$tag:/root/.nuget/packages"
     )
-    if [ -f "$RALPH_ROOT/ralph-specs/resources/nuget.config" ]; then
+    if [ -f "$TARGET_REPO_ROOT/.ralph/nuget.config" ]; then
+      dotnet_extra+=(-v "$TARGET_REPO_ROOT/.ralph/nuget.config:/work/nuget.config:ro")
+      echo "[Ralph][sidecar] Using target repo's .ralph/nuget.config for dotnet sidecar" >&2
+    elif [ -f "$RALPH_ROOT/ralph-specs/resources/nuget.config" ]; then
       dotnet_extra+=(-v "$RALPH_ROOT/ralph-specs/resources/nuget.config:/work/nuget.config:ro")
+      echo "[Ralph][sidecar] WARN: no .ralph/nuget.config in target repo; using shared runner nuget.config (includes api.nuget.org — will fail behind corp proxies)" >&2
     fi
     [ -n "${NUGET_PRIVATE_FEED_URL:-}" ] && dotnet_extra+=(-e "NUGET_PRIVATE_FEED_URL=$NUGET_PRIVATE_FEED_URL")
     [ -n "${PROGET_DOTNET_TOKEN:-}" ]    && dotnet_extra+=(-e "PROGET_DOTNET_TOKEN=$PROGET_DOTNET_TOKEN")
