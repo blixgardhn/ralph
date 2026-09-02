@@ -38,4 +38,4 @@
 - Core logic and non-trivial behavior should be covered; prefer fast, deterministic tests over brittle integration tests.
 - Provide seed data that can be loaded into the database on demand.
 - For acceptance tests, always seed the database before running tests.
-- Run targeted tests at minimum; run the full suite when the PRD is complete.
+- Run targeted tests only. Do not run the full suite per task. Full-suite runs are for PRD completion, or when changes touch broadly shared code (public API, base classes, DI wiring, config). Same for typecheck: prefer file-scoped or project-scoped over solution-wide.
