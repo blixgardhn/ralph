@@ -4,7 +4,6 @@ set -euo pipefail
 PRD_FILE="${PRD_FILE:-.ralph/tasks.json}"
 SUGGESTIONS_FILE="${SUGGESTIONS_FILE:-.ralph/suggested_improvements.md}"
 PROGRESS_FILE="${PROGRESS_FILE:-.ralph/progress.md}"
-ALLOW_CREATE_SUGGESTIONS="${ALLOW_CREATE_SUGGESTIONS:-false}"
 ENFORCE_BRANCH="${ENFORCE_BRANCH:-false}"
 
 usage() {
@@ -12,9 +11,8 @@ usage() {
 Usage: scripts/check_prd.sh
 Env:
   PRD_FILE: path to tasks.json (default .ralph/tasks.json)
-  SUGGESTIONS_FILE: path to suggested_improvements.md (default .ralph/suggested_improvements.md)
+  SUGGESTIONS_FILE: path to suggested_improvements.md (default .ralph/suggested_improvements.md; auto-created if missing)
   PROGRESS_FILE: path to progress.md (default .ralph/progress.md)
-  ALLOW_CREATE_SUGGESTIONS=true|false (default false)
   ENFORCE_BRANCH=true|false (default false; when true, branchName must match current git branch)
 EOF
 }
@@ -35,14 +33,11 @@ if [[ ! -f "$PRD_FILE" ]]; then
 fi
 
 if [[ ! -f "$SUGGESTIONS_FILE" ]]; then
-  if [[ "$ALLOW_CREATE_SUGGESTIONS" == "true" ]]; then
-    mkdir -p "$(dirname "$SUGGESTIONS_FILE")"
-    echo "# Suggested Improvements" > "$SUGGESTIONS_FILE"
-    echo "Created $SUGGESTIONS_FILE" >&2
-  else
-    echo "[check_prd] Suggestions file not found at $SUGGESTIONS_FILE (set ALLOW_CREATE_SUGGESTIONS=true to create)" >&2
-    exit 1
-  fi
+  # Ralph's init_suggestions_file() creates this lazily; preflight should not
+  # halt on its absence. Auto-create a stub if missing.
+  mkdir -p "$(dirname "$SUGGESTIONS_FILE")"
+  echo "# Suggested Improvements" > "$SUGGESTIONS_FILE"
+  echo "[check_prd] Created missing $SUGGESTIONS_FILE" >&2
 fi
 
 # Validate basic shape
@@ -60,15 +55,28 @@ if [[ "$ENFORCE_BRANCH" == "true" ]] && command -v git >/dev/null 2>&1; then
   fi
 fi
 
+# Hard-require only what the runtime validator (prd_utils.sh:validate_prd)
+# requires: id, title, passes. description and acceptanceCriteria are advisory
+# — the runner does not enforce them, so preflight should not either.
 missing_required=$(jq -r '
   .tasks[] | select(
-    (.id | not) or (.title | not) or (.description | not) or (.acceptanceCriteria | not) or (.passes | type != "boolean")
+    (.id | not) or (.title | not) or (.passes | type != "boolean")
   ) | .id // "<missing-id>"' "$PRD_FILE")
 
 if [[ -n "$missing_required" ]]; then
-  echo "[check_prd] Tasks missing required fields (id/title/description/acceptanceCriteria/passes):" >&2
+  echo "[check_prd] Tasks missing required fields (id/title/passes):" >&2
   echo "$missing_required" >&2
   exit 1
+fi
+
+missing_advisory=$(jq -r '
+  .tasks[] | select(
+    (.description | not) or (.acceptanceCriteria | not)
+  ) | .id // "<missing-id>"' "$PRD_FILE")
+
+if [[ -n "$missing_advisory" ]]; then
+  echo "[check_prd] WARN: tasks missing advisory fields (description/acceptanceCriteria):" >&2
+  echo "$missing_advisory" >&2
 fi
 
 # Boilerplate ACs (typecheck / tests) are advisory, not required. The PRD

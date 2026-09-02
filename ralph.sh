@@ -1583,7 +1583,7 @@ main() {
   log_instruction_fingerprints
   require_prd_file
   if [ -x "$RALPH_ROOT/scripts/check_prd.sh" ]; then
-    PRD_FILE="$PRD_FILE" SUGGESTIONS_FILE="$SUGGESTIONS_FILE" PROGRESS_FILE="$PROGRESS_FILE" ALLOW_CREATE_SUGGESTIONS=true "$RALPH_ROOT/scripts/check_prd.sh"
+    PRD_FILE="$PRD_FILE" SUGGESTIONS_FILE="$SUGGESTIONS_FILE" PROGRESS_FILE="$PROGRESS_FILE" "$RALPH_ROOT/scripts/check_prd.sh"
   fi
   enforce_feature_branch
   archive_prd_if_changed
