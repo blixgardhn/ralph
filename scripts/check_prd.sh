@@ -71,15 +71,23 @@ if [[ -n "$missing_required" ]]; then
   exit 1
 fi
 
-missing_boilerplate=$(jq -r '
+# Boilerplate ACs (typecheck / tests) are advisory, not required. The PRD
+# skill decides per task whether they apply (docs-only, config-only, and
+# scaffold tasks legitimately omit them; see prompt.md §Skipped verifications
+# and skills/prd/SKILL.md). check_prd.sh must not overrule that decision.
+#
+# We accept any AC mentioning "typecheck" (case-insensitive) — this covers
+# "Typecheck passes", "Scoped typecheck passes", "Solution typecheck passes",
+# etc. — and only WARN when a task has none. Same for tests.
+
+missing_typecheck=$(jq -r '
   .tasks[] | select(
-    ([.acceptanceCriteria[]?] | index("Typecheck passes")) | not
+    ([.acceptanceCriteria[]?] | map(ascii_downcase) | map(test("typecheck")) | any) | not
   ) | .id' "$PRD_FILE")
 
-if [[ -n "$missing_boilerplate" ]]; then
-  echo "[check_prd] Tasks missing acceptance criterion: Typecheck passes" >&2
-  echo "$missing_boilerplate" >&2
-  exit 1
+if [[ -n "$missing_typecheck" ]]; then
+  echo "[check_prd] WARN: tasks without a typecheck-related AC (may be intentional for docs/config/scaffold tasks):" >&2
+  echo "$missing_typecheck" >&2
 fi
 
 missing_tests_ac=$(jq -r '
@@ -88,9 +96,8 @@ missing_tests_ac=$(jq -r '
   ) | .id' "$PRD_FILE")
 
 if [[ -n "$missing_tests_ac" ]]; then
-  echo "[check_prd] Tasks missing any acceptance criterion mentioning tests" >&2
+  echo "[check_prd] WARN: tasks without any AC mentioning tests (may be intentional for docs/config tasks):" >&2
   echo "$missing_tests_ac" >&2
-  exit 1
 fi
 
 unknown_dep_ids=$(jq -r '
