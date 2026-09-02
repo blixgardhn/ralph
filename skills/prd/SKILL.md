@@ -82,17 +82,19 @@ When the scope is truly tiny (e.g., a config tweak, a single-file rename, a one-
 ### Methodology-Specific AC Constraints
 
 Every task **must** include the following mandatory acceptance criteria where applicable:
-- `Typecheck passes` — always required.
-- `Tests pass` — required when the task includes testable logic.
+- `Scoped typecheck passes` — required when the task touches code that participates in typechecking. **Do not require full/solution-wide typecheck per task**; scope is the changed project/module.
+- `Scoped tests pass` — required when the task includes testable logic. Same scope rule: the tests for the changed module, not the full suite.
 - `Verify in browser using dev-browser skill` — required for any task with UI changes.
 - `Spec gaps recorded and resolved` — required when the task touches ambiguous or underspecified areas.
 - `Containerized execution verified` — required when the task introduces new build/run/test commands.
+
+Full-suite / solution-wide checks belong on the **final consolidation task** at the end of the PRD (or a task that changes broadly shared code — public API, base classes, DI wiring, dependency updates). Do not add full-suite ACs to every task.
 
 Hard constraints on task composition:
 - **Schema + UI in one task is banned.** Separate data-layer changes from presentation changes.
 - **Seed data/fixtures must be enumerated per task** when ACs depend on preloaded data; do not leave seed data as an afterthought.
 - **Documentation task required** when user-facing behavior changes (e.g., new CLI flags, API endpoints, UI flows).
-- **Maximum 5 acceptance criteria per task** (excluding boilerplate ACs like "Typecheck passes" and "Tests pass"). If more are needed, split the task.
+- **Maximum 5 acceptance criteria per task** (excluding boilerplate ACs like "Scoped typecheck passes" and "Scoped tests pass"). If more are needed, split the task.
 - **Maximum 6 subtasks per task.** If you cannot scope subtasks without crossing boundaries, split the task.
 - **Tasks must be self-contained and focused.** Each task should be implementable without needing deep knowledge of other unfinished tasks. The implementation agent receives only the task JSON, not the full PRD context.
 
@@ -158,7 +160,7 @@ Sections:
 3. Tasks (formerly “user stories”) — each task must be one focused iteration
    - Title, Description ("As a [user], I want [feature] so that [benefit]"), Acceptance Criteria
    - UI tasks also require: "Verify in browser using dev-browser skill"
-   - Always include: "Typecheck passes"; add "Tests pass" when logic is testable
+   - Always include: "Scoped typecheck passes" (project/module-scoped, not solution-wide); add "Scoped tests pass" when logic is testable. Full-suite ACs go on the consolidation task only.
 4. Functional Requirements — numbered, explicit (FR-1, FR-2...)
 5. Non-Goals — what is out of scope
 6. Design Considerations (optional)
@@ -175,8 +177,8 @@ Task format:
 **Acceptance Criteria:**
 - [ ] Verifiable criterion
 - [ ] Another verifiable criterion
-- [ ] Typecheck passes
-- [ ] Tests pass (include when applicable)
+- [ ] Scoped typecheck passes (changed project/module only)
+- [ ] Scoped tests pass (changed module only; include when applicable)
 - [ ] Verify in browser using dev-browser skill (UI stories)
 ```
 **Important:**
@@ -198,7 +200,7 @@ Task format:
       "id": "T-001",
       "title": "[Task title]",
       "description": "As a [user], I want [feature] so that [benefit]",
-      "acceptanceCriteria": ["Criterion 1", "Criterion 2", "Typecheck passes"],
+      "acceptanceCriteria": ["Criterion 1", "Criterion 2", "Scoped typecheck passes", "Scoped tests pass"],
       "subtasks": ["Subtask 1", "Subtask 2"],
       "keyFiles": ["src/routes/example.ts", "src/services/example.ts", "tests/example.test.ts (create new)"],
       "implementationNotes": "Follow the pattern in src/routes/users.ts for route + controller + test structure. Use the existing BaseService class for the service layer.",
@@ -219,7 +221,7 @@ Task format:
 - Schema+UI in one task is not allowed—separate data changes from presentation changes.
 - IDs sequential (T-001...); task order follows dependency and implementation flow. Do not add priority fields—selection happens at runtime based on array position.
 - **Self-contained tasks.** Each task must be implementable by an agent that can only see that task's JSON (plus the codebase as left by previous tasks). Include enough context in `description`, `implementationNotes`, and `subtasks` for the task to be executed without referencing the PRD or other tasks.
-- Every task has "Typecheck passes"; add "Tests pass" when relevant; add "Verify in browser using dev-browser skill" for UI; add "Spec gaps recorded and resolved" when touching ambiguous areas; add "Containerized execution verified" when introducing new build/run/test commands.
+- Every task has "Scoped typecheck passes" (changed project/module only); add "Scoped tests pass" when relevant (changed module only); add "Verify in browser using dev-browser skill" for UI; add "Spec gaps recorded and resolved" when touching ambiguous areas; add "Containerized execution verified" when introducing new build/run/test commands. Do **not** add solution-wide typecheck or full-suite ACs to every task — those belong on the final consolidation task, or on tasks that change broadly shared code.
 - `branchName` = `ralph/prd-<NNNN>-<feature-name-kebab-case>` (must include PRD ID for provenance).
 - Include seed data requirements when acceptance tests need preloaded data.
 - `subtasks`: every story lists 3–6 actionable subtasks scoped to that story only; if you cannot do that without crossing boundaries, split again.
@@ -248,8 +250,8 @@ Run this checklist after producing both files:
 - [ ] **Task array order is correct**: each task can be implemented after its predecessors without forward references
 - [ ] **Each task is self-contained**: description + ACs + subtasks + keyFiles + implementationNotes are sufficient for an agent with no PRD context
 - [ ] No task depends on artifacts from a task that appears later in the array
-- [ ] Every task has `Typecheck passes` AC
-- [ ] Every task with testable logic has `Tests pass` AC
+- [ ] Every task has `Scoped typecheck passes` AC (project/module-scoped, not solution-wide)
+- [ ] Every task with testable logic has `Scoped tests pass` AC
 - [ ] Every UI task has `Verify in browser using dev-browser skill` AC
 - [ ] Seed data/fixtures are enumerated per task where ACs depend on them
 - [ ] No task mixes schema/data-layer changes with UI/presentation changes
@@ -288,7 +290,7 @@ Be explicit, avoid jargon, number requirements, and use concrete examples. Accep
 - [ ] Tasks are small, ordered by dependency, and every functional requirement is covered by at least one task
 - [ ] **Sequential execution verified**: each task can be implemented after its predecessors without forward references
 - [ ] **Tasks are self-contained**: each task's JSON is sufficient for an isolated agent to implement it
-- [ ] Every task has verifiable acceptance criteria with required boilerplate lines (typecheck, tests, browser, spec gaps, container as applicable)
+- [ ] Every task has verifiable acceptance criteria with required boilerplate lines (scoped typecheck, scoped tests, browser, spec gaps, container as applicable). Solution-wide/full-suite ACs are only on the consolidation task or on tasks changing broadly shared code.
 - [ ] No task mixes schema/data-layer with UI/presentation changes
 - [ ] Every task has `keyFiles` and `implementationNotes` populated (by Codebase Pattern Analyst)
 - [ ] Seed data/fixtures enumerated per task where ACs depend on them

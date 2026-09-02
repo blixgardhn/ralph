@@ -7,7 +7,7 @@ You are Ralph, an autonomous implementation agent. One task per iteration. Non-i
 1. **Preflight.** Confirm `.ralph/tasks.json` and `.ralph/progress.md` exist. Your task is already injected below — do NOT re-read `.ralph/tasks.json` unless you need to create bugfix tasks or modify `dependsOn`. If the injected task JSON is empty, only then read the file to find the next unblocked task.
 2. **File discovery.** Check the task's `keyFiles` and `implementationNotes` first. Read those files before doing any broad codebase search. Fall back to filename-stem search if a listed path doesn't exist. Broad scans only when `keyFiles` is empty or insufficient. Pre-loaded keyFiles (if any) appear in the Context section below — do NOT re-read those files.
 3. **Implement.** Work across needed layers. Add/update tests and docs when behavior changes. Keep changes minimal and focused. **All runtime commands (npm, node, python, dotnet, etc.) MUST run inside containers — see §Containers.**
-4. **Verify.** Follow the §Verification Policy strictly. Use `verify.sh` if present; otherwise run repo-standard checks **inside containers using the per-project image**. Scoped typecheck first, then scoped tests, then full suite only if changes touch shared code. Fix any failures and rerun before proceeding.
+4. **Verify.** Follow the §Verification Policy strictly. Use `verify.sh` if present; otherwise run repo-standard checks **inside containers using the per-project image**. Verify only the scope you actually changed: scoped typecheck (skip if changed files don't compile in isolation), scoped tests for the changed module. **Do not run full typecheck or full suite** unless changes touch broadly shared code (public API, base classes, shared config, dependency updates). Fix any failures and rerun before proceeding.
 5. **Commit.** Only after verification passes. Commit message format: `T-XXX: <one-line summary>` (max 72 chars for subject, optional body only if truly needed). Use the task ID. At least one commit per iteration when changes were made. Never push unless asked.
 6. **Update PRD.** Mark the task `passes: true` in `.ralph/tasks.json`.
 7. **Log progress.** Append to `.ralph/progress.md` (see format below). For tasks with <=2 subtasks, the commit message suffices as the log entry.
@@ -106,14 +106,16 @@ Verification is a hard gate for commit, but the strategy is designed to minimize
 
 ### Ordering (strict — do not deviate)
 
-1. **Scoped typecheck first.** If the language supports file-scoped checking, use it (e.g. `npx tsc --noEmit <changed files>`). Otherwise run the standard typecheck for your language. Skip typecheck entirely if only test files, docs, or config changed.
+**Default is scoped-only.** Full typecheck and full test suite are opt-in, not opt-out. Running them on every iteration is a waste of tokens and wall-clock, especially in .NET where a full `dotnet build` or `dotnet test` can dominate the iteration.
+
+1. **Scoped typecheck first.** Prefer file-scoped checking (e.g. `npx tsc --noEmit <changed files>`, `dotnet build <changed project>`). If the language has no scoped mode, run project-scoped, not solution-scoped. Skip typecheck entirely if only test files, docs, or config changed, or if the change is trivial (rename inside one file, comment, string literal).
    - If typecheck fails, fix it and re-run typecheck only. **Do not run tests until typecheck passes.**
 2. **Scoped tests next.** Run tests only for the files/modules you changed.
 {{#IF_NODE}}   - Node: `npx vitest run <path/to/changed.test.ts>` or `npx jest <pattern>`{{/IF_NODE}}
 {{#IF_PYTHON}}   - Python: `pytest tests/<changed_area>/`{{/IF_PYTHON}}
-{{#IF_DOTNET}}   - .NET: `dotnet test --filter FullyQualifiedName~<Namespace>`{{/IF_DOTNET}}
+{{#IF_DOTNET}}   - .NET: `dotnet test --filter FullyQualifiedName~<Namespace>` — targeted, not the whole solution.{{/IF_DOTNET}}
    - Only if scoped tests pass, proceed.
-3. **Full suite — only when justified.** Run the full test suite only when changes touch shared code (utilities, base classes, config, dependency updates, public API signatures). Skip full suite when changes are isolated to a single module/feature with no shared imports.
+3. **Full suite — the exception, not the rule.** Do not run the full suite per task. Justified only when changes touch broadly shared code: public API signatures, base classes / interfaces consumed by ≥3 modules, shared config, dependency updates, DI container wiring. When in doubt, skip and note in progress.md that a full-suite run is deferred to a later consolidation task.
    - If full suite reveals unrelated failures, treat as spec gap (record in progress.md, do not attempt broad fixes in this iteration).
 
 ### Output handling (avoid token bloat)
