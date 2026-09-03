@@ -72,7 +72,7 @@ archive_prd_if_changed() {
       echo "## Codebase Patterns"
       echo ""
       echo "# Ralph Progress Log"
-      echo "Started: $(date)"
+      echo "Started: $(date -u --iso-8601=seconds)"
       echo "---"
     } > "$PROGRESS_FILE"
   fi
@@ -89,7 +89,7 @@ init_progress_file() {
     echo "## Codebase Patterns"
     echo ""
     echo "# Ralph Progress Log"
-    echo "Started: $(date)"
+    echo "Started: $(date -u --iso-8601=seconds)"
     echo "---"
   } > "$PROGRESS_FILE"
 }
@@ -120,7 +120,7 @@ append_suggestion_entry() {
   fi
 
   {
-    echo "## $(date --iso-8601=seconds) - Iteration $iteration ($outcome)"
+    echo "## $(date -u --iso-8601=seconds) - Iteration $iteration ($outcome)"
     echo "- $detail"
     echo "---"
   } >> "$SUGGESTIONS_FILE"
