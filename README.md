@@ -255,12 +255,12 @@ The PRD skill runs 8 specialized roles (clarification, scope, feasibility, codeb
 
 Ralph includes several features to reduce API costs:
 
-**Two-tier model routing** — Set `OPENCODE_MODEL_CHEAP` and `OPENCODE_MODEL_STRONG` in your `.env`. Simple tasks (docs, config, renames) route to the cheap model; complex tasks (multi-file logic, test writing) route to the strong model. The PRD skill can also set `tier: "cheap"` or `"strong"` per task.
+**Two-tier model routing** — Defaults: `OPENCODE_MODEL_CHEAP=github-copilot/claude-sonnet-5`, `OPENCODE_MODEL_STRONG=github-copilot/claude-opus-4.8`. Override in `.env` or via `--cheap-model` / `--strong-model` flags. Simple tasks (docs, config, renames) route to the cheap model; complex tasks (multi-file logic, test writing) route to the strong model. The PRD skill can also set `tier: "cheap"` or `"strong"` per task.
 
 ```bash
-# Example .env
-OPENCODE_MODEL_CHEAP=github-copilot/claude-sonnet-4
-OPENCODE_MODEL_STRONG=github-copilot/claude-opus-4
+# Example .env override
+OPENCODE_MODEL_CHEAP=github-copilot/claude-sonnet-5
+OPENCODE_MODEL_STRONG=github-copilot/claude-opus-4.8
 ```
 
 **Auto-promote on retry** — If a task gets stuck (same task selected twice), the second attempt automatically escalates to the strong model.

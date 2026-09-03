@@ -18,8 +18,8 @@ SIDECAR_MODE_EXPLICIT=false
 # to opt into cleanup.
 SIDECAR_STOP_ON_EXIT=false
 OPENCODE_MODEL="${OPENCODE_MODEL:-}"
-OPENCODE_MODEL_CHEAP="${OPENCODE_MODEL_CHEAP:-}"
-OPENCODE_MODEL_STRONG="${OPENCODE_MODEL_STRONG:-}"
+OPENCODE_MODEL_CHEAP="${OPENCODE_MODEL_CHEAP:-github-copilot/claude-sonnet-5}"
+OPENCODE_MODEL_STRONG="${OPENCODE_MODEL_STRONG:-github-copilot/claude-opus-4.8}"
 # Context capacity thresholds (approximate tokens) for tier auto-upgrade.
 # When estimated prompt tokens exceed CHEAP_MAX, auto-upgrade to strong.
 # Defaults tuned for typical performance sweet-spots (not absolute model limits):
