@@ -179,6 +179,7 @@ Do not fetch CI status. It costs network calls, adds noise, and duplicates local
 
 - Use built-in tools (read, write, edit, bash) with absolute paths. Call `read` before any edit.
 - **Do not re-read files you just edited.** The edit tool confirms the change; a second read is waste.
+- **Exception — critical write verification.** After using `write` (not `edit`) to create or replace a file that a later step will build/test/commit against, immediately `grep` for one representative substring you just wrote (e.g. a class name, a config key). If the substring isn't found, the write did not persist — rewrite once and grep again. Applies to: new source files, Dockerfiles, config files (nuget.config, appsettings, docker-compose.yml), test files. Skips: docs-only, progress.md, tasks.json. This is a 1-line grep, not a full re-read.
 - **Do not `ls` or `find` in generated/vendored directories:** `node_modules/`, `dist/`, `build/`, `.git/`, `vendor/`, `target/`, `bin/`, `obj/`. Filter these with `--exclude` or use glob patterns instead.
 - Read only what the current task requires. No speculative reads. If you're tempted to read a file "to understand context," check if the task's `implementationNotes` already tells you what you need.
 - Prefer `grep` over `read` when searching for a specific symbol or pattern.
@@ -194,8 +195,10 @@ Append to `.ralph/suggested_improvements.md` only for genuine Ralph-process issu
 
 ## Progress Log Format
 
+Use **UTC ISO-8601** timestamps in progress log entries (`date -u --iso-8601=seconds`, e.g. `2026-08-31T13:47:39Z`). Local-time timestamps are ambiguous across runs and machines.
+
 ```
-## [ISO timestamp] - [Task ID]
+## [UTC ISO-8601 timestamp, e.g. 2026-08-31T13:47:39Z] - [Task ID]
 - Changed: key files/functions
 - Verified: commands + one-line result (e.g. "tests: 42/42 pass, 3.2s"). If output was large, reference .ralph/last-verify.log
 - Notes: patterns, gotchas, follow-ups

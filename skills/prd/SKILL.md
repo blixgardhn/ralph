@@ -228,6 +228,16 @@ Task format:
 - `keyFiles` (optional): array of file paths relevant to the task — files to read, create, or modify. Populated by the Codebase Pattern Analyst (Role 5). Paths that don't exist yet should include a `(create new)` suffix. These are hints, not guarantees; iteration agents should fall back to searching by filename stem if a listed path doesn't exist.
 - `implementationNotes` (optional): concise guidance on how to implement — which patterns to follow, reference implementations in the codebase, naming conventions, test file locations. Populated by the Codebase Pattern Analyst (Role 5).
 
+### Path discipline (mandatory)
+
+**All paths in `keyFiles` and `implementationNotes` must be relative and inside the target repo.** Iteration agents run non-interactively and cannot approve reads outside the workspace; an absolute path like `/home/user/other-repo/File.cs` causes the iteration to stall on a permission prompt (fatal for the loop).
+
+- Never use absolute paths.
+- Never reference sibling repositories or paths outside `$TARGET_REPO_ROOT`.
+- If a task genuinely needs to mirror or reference an external file, insert a **vendoring task earlier in the sequence** that copies the referenced file(s) into the target repo (e.g. under `.ralph/reference/`, git-ignored) and updates later tasks to point at the local copy.
+- Alternatively, embed the required content inline in `implementationNotes` (for small snippets) so no external read is required.
+- The Codebase Pattern Analyst and Quality & Coherence Reviewer must both check this before the PRD is finalized.
+
 ---
 
 ## Step 4: Outputs and Traceability
@@ -258,6 +268,7 @@ Run this checklist after producing both files:
 - [ ] Every task has `keyFiles` populated (may be empty array for greenfield scaffold tasks only)
 - [ ] Every task has `implementationNotes` populated (may be brief for trivial tasks)
 - [ ] `keyFiles` paths are plausible given the codebase structure
+- [ ] All `keyFiles` and `implementationNotes` paths are relative and inside the target repo (no absolute paths, no sibling-repo references). External references are vendored via an earlier task or embedded inline.
 - [ ] `branchName` includes PRD ID: `ralph/prd-<id>-<feature-slug>`
 - [ ] Role sign-off checklist is complete (all roles have no remaining objections)
 - [ ] Change ledger is present and documents accepted/rejected suggestions with rationale
