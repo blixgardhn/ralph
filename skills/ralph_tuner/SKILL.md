@@ -22,7 +22,7 @@ Each line is one iteration:
   "iter": 3,
   "task": "T-003",
   "tier": "cheap|strong|unknown",
-  "model": "github-copilot/claude-sonnet-4.6",
+  "model": "github-copilot/claude-sonnet-5",
   "initial_tokens": 4560,
   "estimated_tokens": 22800,
   "expansion": 5,
