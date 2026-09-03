@@ -147,7 +147,7 @@ The minimal config is shown in the [Quick Start](#3-configure-opencode-permissio
     "/path/to/your/projects/**": "allow"
   }
   ```
-- **Model** — OpenCode includes free models out of the box; the default works without any configuration. If you have a GitHub Copilot subscription, you can use Copilot-hosted models by overriding via `.env` in your project root (e.g. `OPENCODE_MODEL=github-copilot/claude-opus-4.6`), the `--opencode-model` flag, or the `OPENCODE_MODEL` env var.
+- **Model** — OpenCode includes free models out of the box; the default works without any configuration. If you have a GitHub Copilot subscription, you can use Copilot-hosted models by overriding via `.env` in your project root (e.g. `OPENCODE_MODEL=github-copilot/claude-opus-4.8`), the `--opencode-model` flag, or the `OPENCODE_MODEL` env var.
 - **Custom providers** — you can add providers (OpenAI, Ollama, etc.) under the `"provider"` key. Keep API keys out of this file if you plan to share your config; use environment variables instead.
 - **Duplicate JSON keys** — JSON parsers take the last value for duplicate keys. If you have per-path permission overrides, ensure they don't get silently overridden by a later blanket rule.
 
