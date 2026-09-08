@@ -34,8 +34,8 @@
 - Update README only when user-facing behavior changes.
 
 ## Tests
-- Add tests when they provide meaningful confidence.
-- Core logic and non-trivial behavior should be covered; prefer fast, deterministic tests over brittle integration tests.
+- Add tests only when they add meaningful confidence for non-trivial behavior. There is no test quota — do not add tests for CRUD, DTOs, wiring, or code obvious by inspection. A task is not incomplete for lacking new tests.
+- When tests are warranted, cover core/non-trivial logic; prefer fast, deterministic tests over brittle integration tests.
 - Provide seed data that can be loaded into the database on demand.
 - For acceptance tests, always seed the database before running tests.
-- Run targeted tests only. Do not run the full suite per task. Full-suite runs are for PRD completion, or when changes touch broadly shared code (public API, base classes, DI wiring, config). Same for typecheck: prefer file-scoped or project-scoped over solution-wide.
+- Verification (typecheck/tests) is opt-in per iteration, not a per-task gate — see the Verification Policy in `prompt.md`. Default to skipping; run scoped checks only when a trigger fires; batch to consolidation checkpoints. Never run the full suite or solution-wide typecheck per task.

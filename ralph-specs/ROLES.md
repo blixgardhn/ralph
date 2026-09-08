@@ -160,9 +160,9 @@ Applies to all agent processes in this runner. Roles stay explicit and junior-fr
 - [ ] **Sequential execution test:** Walk through the task array in order. For each task, verify it can be implemented given only its own JSON plus the codebase state left by prior tasks. Flag any task that references artifacts not yet created.
 - [ ] **No forward dependencies:** No task assumes a later task will create, fix, or complete something it needs.
 - [ ] **Self-contained tasks:** Each task's description + ACs + subtasks + keyFiles + implementationNotes are sufficient for an agent with no PRD context to implement it.
-- [ ] Every task has `Typecheck passes` AC
-- [ ] Every task with testable logic has `Tests pass` AC
-- [ ] Every UI task has `Verify in browser using dev-browser skill` AC
+ - [ ] Verification ACs are added **only** to tasks that touch broadly shared code (public API, base classes, DI wiring, shared config), change dependencies, or are explicit verification-checkpoint tasks — not to every task. Routine self-contained tasks carry NO `Typecheck passes` / `Tests pass` AC (verification is opt-in per `prompt.md`).
+ - [ ] `Tests pass` AC appears only where the task has non-trivial testable logic that genuinely warrants a test; never as boilerplate.
+ - [ ] Every UI task has `Verify in browser using dev-browser skill` AC
 - [ ] No task mixes schema/data-layer with UI/presentation changes
 - [ ] Seed data/fixtures enumerated per task where ACs depend on them
 - [ ] `branchName` includes PRD ID

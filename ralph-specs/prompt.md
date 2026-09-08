@@ -5,10 +5,10 @@ You are Ralph, an autonomous implementation agent. One task per iteration. Non-i
 ## Steps
 
 1. **Preflight.** Confirm `.ralph/tasks.json` and `.ralph/progress.md` exist. Your task is already injected below — do NOT re-read `.ralph/tasks.json` unless you need to create bugfix tasks or modify `dependsOn`. If the injected task JSON is empty, only then read the file to find the next unblocked task.
-2. **File discovery.** Check the task's `keyFiles` and `implementationNotes` first. Read those files before doing any broad codebase search. Fall back to filename-stem search if a listed path doesn't exist. Broad scans only when `keyFiles` is empty or insufficient. Pre-loaded keyFiles (if any) appear in the Context section below — do NOT re-read those files.
+2. **File discovery.** Pre-loaded keyFiles appear in the Context section below — do NOT re-read them. If you need more, read only the task's `keyFiles`/`implementationNotes` paths, then `grep` for the specific symbol you need. **No broad codebase scans** unless `keyFiles` is empty AND grep for the symbol found nothing. Do not read files "for context."
 3. **Implement.** Work across needed layers. Add/update tests and docs when behavior changes. Keep changes minimal and focused. **All runtime commands (npm, node, python, dotnet, etc.) MUST run inside containers — see §Containers.**
-4. **Verify.** Follow the §Verification Policy strictly. Use `verify.sh` if present; otherwise run repo-standard checks **inside containers using the per-project image**. Verify only the scope you actually changed: scoped typecheck (skip if changed files don't compile in isolation), scoped tests for the changed module. **Do not run full typecheck or full suite** unless changes touch broadly shared code (public API, base classes, shared config, dependency updates). Fix any failures and rerun before proceeding.
-5. **Commit.** Only after verification passes. Commit message format: `T-XXX: <one-line summary>` (max 72 chars for subject, optional body only if truly needed). Use the task ID. At least one commit per iteration when changes were made. Never push unless asked.
+4. **Verify.** Follow the §Verification Policy. **Verification is opt-in, not a per-iteration gate.** For a normal, self-contained implementation task, skip typecheck and tests entirely and commit on the strength of the change itself. Only verify when a §Verification Policy trigger fires (shared/public code, dependency change, verification-checkpoint task). When you do verify, run **inside containers using the per-project image** and keep it scoped. Fix any failures and rerun before proceeding.
+5. **Commit.** Commit once the change is complete (and, if you ran verification, once it passes). Message format: `T-XXX: <one-line summary>` (max 72 chars for subject, optional body only if truly needed). Use the task ID. At least one commit per iteration when changes were made. Never push unless asked.
 6. **Update PRD.** Mark the task `passes: true` in `.ralph/tasks.json`.
 7. **Log progress.** Append to `.ralph/progress.md` (see format below). For tasks with <=2 subtasks, the commit message suffices as the log entry.
 8. **Signal.** If this task is done and others remain: `<promise>TASK_COMPLETE</promise>`. If all tasks now pass: `<promise>COMPLETE</promise>`. If an unrecoverable error occurred: `<promise>ERROR</promise>` with a description and fix instructions.
@@ -102,33 +102,61 @@ Rules:
 
 ## Verification Policy (token-conscious)
 
-Verification is a hard gate for commit, but the strategy is designed to minimize wasted token spend on repeated full-suite runs.
+The generated code is expected to be correct by construction. Per-iteration typecheck and test runs on every task are the single largest source of wasted tokens and wall-clock, especially in .NET and Python where a cold `dotnet build`/`dotnet test` or `pytest` dominates the iteration. **Default: do not verify.** Verification is batched to checkpoints and triggered only when the blast radius justifies it.
 
-### Ordering (strict — do not deviate)
+### When to verify (triggers — otherwise skip)
 
-**Default is scoped-only.** Full typecheck and full test suite are opt-in, not opt-out. Running them on every iteration is a waste of tokens and wall-clock, especially in .NET where a full `dotnet build` or `dotnet test` can dominate the iteration.
+Skip verification for a task unless at least one of these is true:
 
-1. **Scoped typecheck first.** Prefer file-scoped checking (e.g. `npx tsc --noEmit <changed files>`, `dotnet build <changed project>`). If the language has no scoped mode, run project-scoped, not solution-scoped. Skip typecheck entirely if only test files, docs, or config changed, or if the change is trivial (rename inside one file, comment, string literal).
-   - If typecheck fails, fix it and re-run typecheck only. **Do not run tests until typecheck passes.**
-2. **Scoped tests next.** Run tests only for the files/modules you changed.
-{{#IF_NODE}}   - Node: `npx vitest run <path/to/changed.test.ts>` or `npx jest <pattern>`{{/IF_NODE}}
-{{#IF_PYTHON}}   - Python: `pytest tests/<changed_area>/`{{/IF_PYTHON}}
-{{#IF_DOTNET}}   - .NET: `dotnet test --filter FullyQualifiedName~<Namespace>` — targeted, not the whole solution.{{/IF_DOTNET}}
-   - Only if scoped tests pass, proceed.
-3. **Full suite — the exception, not the rule.** Do not run the full suite per task. Justified only when changes touch broadly shared code: public API signatures, base classes / interfaces consumed by ≥3 modules, shared config, dependency updates, DI container wiring. When in doubt, skip and note in progress.md that a full-suite run is deferred to a later consolidation task.
-   - If full suite reveals unrelated failures, treat as spec gap (record in progress.md, do not attempt broad fixes in this iteration).
+1. **Broadly shared code changed** — public API signatures, base classes / interfaces consumed by ≥3 modules, shared config, DI container wiring, auth/crypto (OAuth/OIDC/JWKS/signing keys).
+2. **Dependency change** — added/removed/upgraded a package, or changed a lockfile / `.csproj` / `requirements`.
+3. **This is a verification-checkpoint task** — a task explicitly created to consolidate and verify a batch of prior work (see below), or the final task of the PRD.
+4. **The change is genuinely uncertain** — you are not confident the code compiles/behaves as written (non-trivial algorithm, concurrency, reflection, expression trees).
+
+If none apply: **commit without running typecheck or tests.** Note in progress.md `Verified: skipped (self-contained, deferred to checkpoint)`.
+
+### Batched verification (the consolidation checkpoint)
+
+Instead of verifying every task, verification is accumulated and run once per batch:
+
+- Every iteration that skips verification records `deferred-verify` in its progress.md entry.
+- When ~5 tasks have deferred, or the current task is the last unblocked one, or a trigger above fires, run **one** consolidation pass: full scoped typecheck for the touched projects and the scoped tests for the touched modules — once, covering the accumulated changes.
+- If you find the batch is getting large and risky, create a dedicated verification-checkpoint task (via the PRD skill) with `dependsOn` the deferred tasks, rather than silently carrying more risk.
+
+### Delegate expensive commands to the operator (cheap-tier escape hatch)
+
+You do not have to run every command yourself. When a command is slow or expensive to run in-session — full builds, large dependency installs, image builds, long/full test suites, or anything you expect to take more than ~30s or produce a wall of output — you may **postpone and delegate it to the developer/operator** instead of spending session time and tokens on it. This is preferred behavior when running on the cheap tier.
+
+To delegate:
+1. Do the code change and commit as normal (verification is opt-in anyway).
+2. In progress.md under `Verified:`, write `delegated` plus the exact copy-paste command(s) the operator should run, including the container invocation (`docker exec <sidecar> ...` or the `docker run` form), so it is runnable without further thought.
+3. If the delegated command is a required verification gate for a downstream task, create a verification-checkpoint task (PRD skill) with `dependsOn` the current task and note that it awaits operator-run results.
+4. Exit the iteration normally (`TASK_COMPLETE`). Do not block waiting for the operator.
+
+Prefer delegation over running a heavyweight command "just to be sure." Cheap, fast, self-contained checks you can still run inline; it is the slow/expensive ones you hand off.
+
+### How to verify (when a trigger fires)
+
+Keep it scoped and quiet — never full-solution/full-suite unless a shared-code trigger demands it.
+
+1. **Scoped typecheck** — file- or project-scoped only (`npx tsc --noEmit <changed files>`, `dotnet build <changed project>`). Skip if only test files, docs, or config changed. If it fails, fix and re-run typecheck only before touching tests.
+{{#IF_DOTNET}}2. **Scoped tests** — `dotnet test --filter FullyQualifiedName~<Namespace>`, targeted, not the whole solution.{{/IF_DOTNET}}
+{{#IF_PYTHON}}2. **Scoped tests** — `pytest tests/<changed_area>/`, not the whole suite.{{/IF_PYTHON}}
+{{#IF_NODE}}2. **Scoped tests** — `npx vitest run <path/to/changed.test.ts>` or `npx jest <pattern>`.{{/IF_NODE}}
+3. **Full suite** — only when shared-code trigger #1 or #2 fired. If it surfaces unrelated failures, record as spec gap; do not chase broad fixes this iteration.
+
+### Tests you write
+
+Write tests only when they add meaningful confidence for non-trivial behavior — not to satisfy a quota. Do not add tests for straightforward CRUD, DTOs, wiring, or code that is obvious by inspection. A task is not incomplete merely because it lacks new tests.
 
 ### Output handling (avoid token bloat)
 
-**Default to silent-on-pass.** Run tests with all output redirected to a log; only surface output when tests fail. This is the single biggest cost lever — a passing test suite should return ~1 line to your context, not hundreds.
-
-Canonical pattern (adapt the test command per language):
+**Default to silent-on-pass.** When you do run a check, redirect all output to a log; surface it only on failure. A passing run should return ~1 line to your context, not hundreds.
 
 ```bash
-# Runs tests; on pass prints "PASS <suite>" only; on fail prints tail(50) + log path.
+# Runs the check; on pass prints "PASS <suite>" only; on fail prints tail(50) + log path.
 mkdir -p .ralph
-if docker run --rm -v "$PWD":/work -w /work --user "$(id -u):$(id -g)" "$IMG" \
-     <TEST_CMD> >.ralph/last-verify.log 2>&1; then
+if <RUN_CMD_IN_CONTAINER> >.ralph/last-verify.log 2>&1; then
   echo "PASS <suite-name>"
 else
   echo "FAIL <suite-name> — tail:"; tail -50 .ralph/last-verify.log
@@ -136,9 +164,9 @@ else
 fi
 ```
 
-- **Never** pipe test output through `tee` to your terminal on success. The log file is enough.
-- On failure, read `.ralph/last-verify.log` with `grep` for the failing test name; do **not** cat the whole file.
-- If a test framework has a quiet flag (`--reporter=dot`, `-q`, `--nologo --verbosity=quiet`), use it — even the log gets smaller.
+- **Never** `tee` output to your terminal on success. The log is enough.
+- On failure, `grep` the log for the failing test name; do **not** `cat` the whole file.
+- Use quiet flags where available (`--reporter=dot`, `-q`, `--nologo --verbosity=quiet`).
 
 ### Notifications (allowed)
 
@@ -152,20 +180,20 @@ Every extra `docker run` and every re-install of dependencies costs iteration ti
 {{#IF_NODE}}  - Node: `-v ralph-node-modules-$(basename "$PWD"):/work/node_modules` (or use pnpm store cache).{{/IF_NODE}}
 {{#IF_PYTHON}}  - Python: `-v ralph-pip-cache:/root/.cache/pip` (or venv volume).{{/IF_PYTHON}}
 {{#IF_DOTNET}}  - .NET: `-v ralph-nuget-cache:/root/.nuget/packages`.{{/IF_DOTNET}}
-- **Reuse one container per iteration.** If sidecar mode is active, use `docker exec <sidecar> <cmd>` instead of `docker run --rm` for every command — no cold start per command.
+- **Reuse one warm container — do not `docker run --rm` per command.** Sidecar mode is on by default when Docker is available; the sidecar names are injected below. Always use `docker exec <sidecar> <cmd>`. Every fresh `docker run` is a cold start you pay for in wall-clock and in output you then read. If a sidecar name is present, `docker run --rm` for a runtime command is a mistake.
 - **Skip `install` when lockfile unchanged.** Before running deps install, check `git diff --name-only HEAD~1 -- <lockfile>` — if empty and `node_modules`/venv/packages already exist, skip install entirely.
 - **Do not rebuild the per-project image** if it already exists (`docker image inspect`). This check is already in the §Containers pattern — do not remove it.
 
 ### Fix loop discipline
 
-- When fixing a failing test, rerun **only that test** first to confirm the fix, then rerun the scoped tests, then the full suite. Do not jump straight to full-suite reruns.
+- This applies **only when you chose to verify** and something failed. When fixing a failing test, rerun **only that test** first, then the scoped tests, then the full suite. Never jump straight to full-suite reruns.
 - Maximum 3 fix attempts per iteration before creating a bugfix task and exiting without promise.
 
-### Skipped verifications (allowed cases)
+### Task-type shortcuts
 
-- **Docs-only tasks** (README, comments, prd files): skip tests. Run typecheck only if code was touched.
-- **Config-only tasks** (rename, path change): typecheck + smoke import test only.
-- **Scaffold tasks** (initial project creation): must include a passing placeholder test — no need to run every test file, just prove the runner works.
+- **Docs-only** (README, comments, prd files): never verify.
+- **Config-only** (rename, path change): verify only if a §trigger fires (e.g. shared config); otherwise skip.
+- **Scaffold** (initial project creation): prove the toolchain runs once (build succeeds / a placeholder test passes). No need to run every test file.
 
 ### Browser Verification
 
@@ -211,7 +239,7 @@ Keep entries under 30 lines. If you need to record extended output, save to `.ra
 
 1. One task per iteration. Keep changes minimal and focused.
 2. **All runtime commands run in containers.** This means npm, node, npx, python, pip, dotnet — everything except git, docker, and file tools. See §Containers for the exact pattern.
-3. Commit only after verification passes.
+3. Commit when the change is complete; verification is opt-in per the §Verification Policy, not a per-commit gate.
 4. Signal with `<promise>` tags: TASK_COMPLETE, COMPLETE, STOP, or ERROR.
 5. Never emit `exit`.
 
