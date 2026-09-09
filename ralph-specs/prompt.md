@@ -115,13 +115,19 @@ Skip verification for a task unless at least one of these is true:
 
 If none apply: **commit without running typecheck or tests.** Note in progress.md `Verified: skipped (self-contained, deferred to checkpoint)`.
 
+**Honest classification.** "Self-contained" means you actually inspected the change surface and it touches only its own module. If you are *guessing* it is self-contained because you didn't look, that is trigger #4 (uncertain) — verify or delegate. Do not launder unverified risk through a lazy "self-contained" label.
+
 ### Batched verification (the consolidation checkpoint)
 
-Instead of verifying every task, verification is accumulated and run once per batch:
+Verification is accumulated and run once per batch, but the batch has a **hard ceiling** — it is not open-ended.
 
-- Every iteration that skips verification records `deferred-verify` in its progress.md entry.
-- When ~5 tasks have deferred, or the current task is the last unblocked one, or a trigger above fires, run **one** consolidation pass: full scoped typecheck for the touched projects and the scoped tests for the touched modules — once, covering the accumulated changes.
-- If you find the batch is getting large and risky, create a dedicated verification-checkpoint task (via the PRD skill) with `dependsOn` the deferred tasks, rather than silently carrying more risk.
+- Every iteration that skips verification appends its task ID to `.ralph/deferred-verify.log` (one line per deferral) and records `deferred-verify` in its progress.md entry.
+- **Run a consolidation pass — full scoped typecheck for the touched projects and scoped tests for the touched modules — when ANY of these is true:**
+  1. `.ralph/deferred-verify.log` has **5 or more** entries. **This is a hard cap, not a suggestion.** At 5 you MUST verify this iteration before committing; you may not defer a 6th.
+  2. The current task is the last unblocked task.
+  3. A §When-to-verify trigger fired.
+- After a successful consolidation pass, **truncate `.ralph/deferred-verify.log`** (the batch is cleared) and record `Verified: checkpoint cleared N deferred tasks` in progress.md.
+- If the consolidation surfaces failures you can't fix within the 3-attempt limit, create a dedicated verification-checkpoint task (PRD skill) with `dependsOn` the deferred task IDs from the log, then exit without promise. Do not clear the log until the failures are resolved.
 
 ### Delegate expensive commands to the operator (cheap-tier escape hatch)
 
@@ -130,8 +136,9 @@ You do not have to run every command yourself. When a command is slow or expensi
 To delegate:
 1. Do the code change and commit as normal (verification is opt-in anyway).
 2. In progress.md under `Verified:`, write `delegated` plus the exact copy-paste command(s) the operator should run, including the container invocation (`docker exec <sidecar> ...` or the `docker run` form), so it is runnable without further thought.
-3. If the delegated command is a required verification gate for a downstream task, create a verification-checkpoint task (PRD skill) with `dependsOn` the current task and note that it awaits operator-run results.
-4. Exit the iteration normally (`TASK_COMPLETE`). Do not block waiting for the operator.
+3. **Mandatory when downstream work depends on this change compiling/passing:** create a verification-checkpoint task (PRD skill) with `dependsOn` the current task ID and note that it awaits operator-run results. Do not skip this — an unverified change that a later task builds on is the one case where delegation can cascade into broken foundations. If you are unsure whether anything depends on it, create the checkpoint task anyway.
+4. A delegated verification still counts as a deferral: append the task ID to `.ralph/deferred-verify.log` and respect the hard cap in §Batched verification.
+5. Exit the iteration normally (`TASK_COMPLETE`). Do not block waiting for the operator.
 
 Prefer delegation over running a heavyweight command "just to be sure." Cheap, fast, self-contained checks you can still run inline; it is the slow/expensive ones you hand off.
 
