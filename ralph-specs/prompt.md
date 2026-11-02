@@ -183,10 +183,10 @@ Pushover notifications via `$RALPH_ROOT/scripts/notify.sh` are cheap once per ru
 
 Every extra `docker run` and every re-install of dependencies costs iteration time and tokens (agent waits, reads output).
 
-- **Cache dependency volumes.** Mount persistent named volumes for package caches so installs are near-instant on repeat runs:
-{{#IF_NODE}}  - Node: `-v ralph-node-modules-$(basename "$PWD"):/work/node_modules` (or use pnpm store cache).{{/IF_NODE}}
-{{#IF_PYTHON}}  - Python: `-v ralph-pip-cache:/root/.cache/pip` (or venv volume).{{/IF_PYTHON}}
-{{#IF_DOTNET}}  - .NET: `-v ralph-nuget-cache:/root/.nuget/packages`.{{/IF_DOTNET}}
+- **Cache dependency volumes.** Mount persistent named volumes for package caches so installs are near-instant on repeat runs. Use exactly these per-repo names (shared with this repo's sidecars); never use an unsuffixed/global cache volume — parallel Ralph runs on other repos would share it:
+{{#IF_NODE}}  - Node: `-v ralph-cache-node-{{REPO_TAG}}:/work/node_modules`.{{/IF_NODE}}
+{{#IF_PYTHON}}  - Python: `-v ralph-cache-pip-{{REPO_TAG}}:/root/.cache/pip`.{{/IF_PYTHON}}
+{{#IF_DOTNET}}  - .NET: `-v ralph-cache-nuget-{{REPO_TAG}}:/root/.nuget/packages`.{{/IF_DOTNET}}
 - **Reuse one warm container — do not `docker run --rm` per command.** Sidecar mode is on by default when Docker is available; the sidecar names are injected below. Always use `docker exec <sidecar> <cmd>`. Every fresh `docker run` is a cold start you pay for in wall-clock and in output you then read. If a sidecar name is present, `docker run --rm` for a runtime command is a mistake.
 - **Skip `install` when lockfile unchanged.** Before running deps install, check `git diff --name-only HEAD~1 -- <lockfile>` — if empty and `node_modules`/venv/packages already exist, skip install entirely.
 - **Do not rebuild the per-project image** if it already exists (`docker image inspect`). This check is already in the §Containers pattern — do not remove it.

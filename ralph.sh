@@ -46,6 +46,100 @@ TARGET_REPO_ARG=""
 TARGET_REPO_ENV_AT_START="${TARGET_REPO:-${target_repo:-}}"
 unset TARGET_REPO target_repo
 
+# ── Per-run state isolation ────────────────────────────────────────
+# Parallel Ralph runs must not share run state. Every process gets its own
+# environment, but run-scoped values can still leak in by inheritance (a shell
+# that exported a previous run's RALPH_SIDECAR_*, or a Ralph launched from an
+# agent of another Ralph). Scrub all run-scoped names at startup; they are
+# re-derived by this run. User *config* (OPENCODE_MODEL*, RALPH_MIN_DISK_GB,
+# org overlay values, ...) is intentionally kept.
+RALPH_RUN_SCOPED_VARS=(
+  RALPH_RUN_ID RALPH_RUN_TMPDIR RALPH_PARENT_RUN_ID
+  RALPH_SIDECAR_NODE RALPH_SIDECAR_PYTHON RALPH_SIDECAR_DOTNET RALPH_REPO_TAG
+  TARGET_REPO_ROOT PINNED_TARGET_REPO_ROOT
+  METADATA_DIR PRD_FILE PROGRESS_FILE SUGGESTIONS_FILE ARCHIVE_DIR LAST_PRD_HASH_FILE
+  RUN_LOCK_FILE RUN_LOCK_HELD RUN_PRD_PROJECT RUN_PRD_BRANCH RUNNER_TREE_BASELINE
+  SELECTED_TASK_ID SELECTED_TASK_JSON BLOCKED_IDS LAST_SELECTED_TASK SAME_TASK_COUNT
+  TOTAL_TASKS LOOP_START_SECS STATIC_PROMPT RESOLVED_AGENTS_FILE RESOLVED_PROMPT_FILE
+  PROMPT_FILE SIDECAR_MODE SIDECAR_MODE_EXPLICIT SIDECAR_STOP_ON_EXIT TOOL MAX_ITERATIONS HOST_MODE
+)
+INHERITED_RUN_ID="${RALPH_RUN_ID:-}"
+for _v in "${RALPH_RUN_SCOPED_VARS[@]}"; do unset "$_v" 2>/dev/null || true; done
+unset _v
+if [ -n "$INHERITED_RUN_ID" ]; then
+  echo "[Ralph][warn] Inherited RALPH_RUN_ID=$INHERITED_RUN_ID from parent environment; scrubbed run-scoped state and starting a fresh run." >&2
+  export RALPH_PARENT_RUN_ID="$INHERITED_RUN_ID"
+fi
+unset INHERITED_RUN_ID
+RALPH_RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}${RANDOM}"
+export RALPH_RUN_ID
+# Re-establish defaults scrubbed above (the scrub runs after their first assignment).
+TOOL="opencode"; MAX_ITERATIONS=30; HOST_MODE=false
+SIDECAR_MODE=false; SIDECAR_MODE_EXPLICIT=false; SIDECAR_STOP_ON_EXIT=false
+TARGET_REPO_ROOT=""; RESOLVED_AGENTS_FILE=""; RESOLVED_PROMPT_FILE=""; STATIC_PROMPT=""
+
+# Per-run temp dir, exported as TMPDIR so agent/tool temp files never collide
+# with a parallel run. Removed on exit.
+RALPH_RUN_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/ralph-run.${RALPH_RUN_ID}.XXXXXX")"
+export RALPH_RUN_TMPDIR
+export TMPDIR="$RALPH_RUN_TMPDIR"
+trap cleanup_run_tmpdir EXIT  # replaced by on_exit once main() is set up
+
+# Names a target-repo .env / org overlay must not set: they would redirect this
+# run's paths, identity or sidecars.
+is_reserved_env_name() {
+  local n="$1" r
+  case "$n" in
+    RALPH_ROOT|TARGET_REPO|target_repo|TMPDIR|RALPH_SIDECAR_*) return 0 ;;
+    _|SHLVL|PWD|OLDPWD|BASH_*|SHELLOPTS|BASHOPTS) return 0 ;;
+  esac
+  for r in "${RALPH_RUN_SCOPED_VARS[@]}"; do
+    [ "$n" = "$r" ] && return 0
+  done
+  return 1
+}
+
+# Load a KEY=VALUE env file without letting it touch run-scoped state.
+# The file is sourced in a subshell; only exported variables it changed or
+# added are imported (and exported, matching `set -a` semantics), minus
+# reserved names. Imported key names are left in LOADED_ENV_NAMES (must not be
+# called via $(...) or the imports would be lost in the subshell).
+load_env_file_isolated() {
+  local file="$1" name value
+  local -a imported=() rejected=()
+  while IFS= read -r -d '' entry; do
+    name="${entry%%=*}"
+    value="${entry#*=}"
+    [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    if [ "${!name+set}" = set ] && [ "${!name}" = "$value" ]; then
+      continue
+    fi
+    case "$name" in _|SHLVL|PWD|OLDPWD|BASH_*|SHELLOPTS|BASHOPTS) continue ;; esac
+    if is_reserved_env_name "$name"; then
+      rejected+=("$name")
+      continue
+    fi
+    printf -v "$name" '%s' "$value"
+    export "${name?}"
+    imported+=("$name")
+  done < <(
+    set -a
+    # shellcheck disable=SC1090
+    source "$file" >/dev/null 2>&1 || true
+    env -0
+  )
+  if [ ${#rejected[@]} -gt 0 ]; then
+    echo "[Ralph][warn] Ignored run-scoped names in $file: ${rejected[*]}" >&2
+  fi
+  LOADED_ENV_NAMES="${imported[*]}"
+}
+
+cleanup_run_tmpdir() {
+  case "${RALPH_RUN_TMPDIR:-}" in
+    */ralph-run.*) rm -rf "$RALPH_RUN_TMPDIR" 2>/dev/null || true ;;
+  esac
+}
+
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -376,6 +470,7 @@ check_runner_tree_unchanged() {
 on_exit() {
   cleanup_sidecars || true
   release_run_lock || true
+  cleanup_run_tmpdir || true
 }
 
 require_agents_file() {
@@ -488,13 +583,19 @@ build_static_prompt() {
   # Sidecar mode note injection
   local sidecar_mode_note=""
   if [ "$SIDECAR_MODE" = true ]; then
-    sidecar_mode_note="**Sidecar mode is active.** Long-lived containers are running for this session. Use \`docker exec <container-name> <cmd>\` instead of \`docker run --rm\`. Available sidecars: \${RALPH_SIDECAR_NODE:-none}, \${RALPH_SIDECAR_PYTHON:-none}, \${RALPH_SIDECAR_DOTNET:-none}."
+    # Concrete names of THIS run's sidecars (not env-var references the agent
+    # could resolve against a stale/inherited environment).
+    sidecar_mode_note="**Sidecar mode is active.** Long-lived containers are running for this session. Use \`docker exec <container-name> <cmd>\` instead of \`docker run --rm\`. Sidecars for this repo only: node=${RALPH_SIDECAR_NODE:-none}, python=${RALPH_SIDECAR_PYTHON:-none}, dotnet=${RALPH_SIDECAR_DOTNET:-none}. Never exec into a sidecar with a different repo tag — it belongs to another Ralph run."
   fi
 
   # Assemble static prompt: agents identity (thin) + prompt directive + rules
   # The prompt.md has {{SIDECAR_MODE_NOTE}} placeholder.
   prompt_block=$(SIDECAR_MODE_NOTE="$sidecar_mode_note" perl -0777 -pe \
     's/\Q{{SIDECAR_MODE_NOTE}}\E/$ENV{SIDECAR_MODE_NOTE}/g' <<< "$prompt_block")
+  # Per-repo cache volume tag (same volumes the sidecars use) so parallel runs
+  # on different repos never share a package cache volume.
+  prompt_block=$(REPO_TAG="$(sidecar_repo_tag)" perl -0777 -pe \
+    's/\Q{{REPO_TAG}}\E/$ENV{REPO_TAG}/g' <<< "$prompt_block")
 
   # Conditional cert/nuget injection — only include when project uses containers/Dockerfiles
   local cert_rules_content="" nuget_rules_content=""
@@ -1829,25 +1930,18 @@ main() {
   parse_args "$@"
   validate_tool
   set_paths
-  # Load .env from target repo if present (allows OPENCODE_MODEL override etc.)
+  # Load .env from target repo if present (allows OPENCODE_MODEL override etc.).
+  # Isolated: cannot set run-scoped names (paths, sidecars, run id, TMPDIR).
   if [ -f "$TARGET_REPO_ROOT/.env" ]; then
-    set -a
-    # shellcheck disable=SC1091
-    source "$TARGET_REPO_ROOT/.env"
-    set +a
-    echo "[Ralph] Loaded .env from $TARGET_REPO_ROOT/.env" >&2
+    load_env_file_isolated "$TARGET_REPO_ROOT/.env"
+    echo "[Ralph] Loaded .env from $TARGET_REPO_ROOT/.env: ${LOADED_ENV_NAMES:-<no changes>}" >&2
   fi
   # Load private org overlay (cert URLs, private feeds) if present.
   # Silent no-op when absent so the public runner works out of the box.
   local private_env="$HOME/.config/ralph-private/org-values.env"
   if [ -f "$private_env" ]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "$private_env"
-    set +a
-    local loaded_vars
-    loaded_vars=$(grep -E '^[A-Z_]+=' "$private_env" 2>/dev/null | sed 's/#.*//' | grep -E '^[A-Z_]+=' | cut -d= -f1 | tr '\n' ' ')
-    echo "[Ralph] Loaded private org overlay ($private_env): $loaded_vars" >&2
+    load_env_file_isolated "$private_env"
+    echo "[Ralph] Loaded private org overlay ($private_env): ${LOADED_ENV_NAMES:-<no changes>}" >&2
   fi
   pin_target_repo_root
   acquire_run_lock
@@ -1871,8 +1965,6 @@ main() {
   init_progress_file
   init_suggestions_file
   validate_prd
-  # B3: Build the static prompt once (instructions + rules); task context injected per-iteration
-  build_static_prompt
   LOOP_START_SECS=$(date +%s)
   compute_total_tasks
   if [ "$HOST_MODE" = true ]; then
@@ -1884,6 +1976,9 @@ main() {
   preflight_docker_disk
   # Launch sidecar containers (parallel start + background cache warming)
   launch_sidecars
+  # B3: Build the static prompt once (instructions + rules); task context injected
+  # per-iteration. Built after sidecars so it names this run's containers.
+  build_static_prompt
   # Verify the AI tool is reachable before burning full iterations
   preflight_tool_check
   run_iterations
