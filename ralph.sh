@@ -58,7 +58,7 @@ RALPH_RUN_SCOPED_VARS=(
   RALPH_SIDECAR_NODE RALPH_SIDECAR_PYTHON RALPH_SIDECAR_DOTNET RALPH_REPO_TAG
   TARGET_REPO_ROOT PINNED_TARGET_REPO_ROOT
   METADATA_DIR PRD_FILE PROGRESS_FILE SUGGESTIONS_FILE ARCHIVE_DIR LAST_PRD_HASH_FILE
-  RUN_LOCK_FILE RUN_LOCK_HELD RUN_PRD_PROJECT RUN_PRD_BRANCH RUNNER_TREE_BASELINE
+  OPENCODE_XDG_DATA OPENCODE_XDG_STATE RUN_LOCK_FILE RUN_LOCK_HELD RUN_PRD_PROJECT RUN_PRD_BRANCH RUNNER_TREE_BASELINE
   SELECTED_TASK_ID SELECTED_TASK_JSON BLOCKED_IDS LAST_SELECTED_TASK SAME_TASK_COUNT
   TOTAL_TASKS LOOP_START_SECS STATIC_PROMPT RESOLVED_AGENTS_FILE RESOLVED_PROMPT_FILE
   PROMPT_FILE SIDECAR_MODE SIDECAR_MODE_EXPLICIT SIDECAR_STOP_ON_EXIT TOOL MAX_ITERATIONS HOST_MODE
@@ -486,6 +486,51 @@ ensure_ralph_dir_gitignored() {
     echo "[Ralph][warn] .ralph/ files are tracked in git despite being run state:" >&2
     printf '%s\n' "$tracked" | sed 's/^/  /' >&2
     echo "[Ralph][warn] Untrack them (keeps files on disk): git -C \"$TARGET_REPO_ROOT\" rm -r --cached .ralph" >&2
+  fi
+}
+
+# ── Per-repo OpenCode data dir (#32) ───────────────────────────────
+# OpenCode keeps sessions, DB, snapshots and logs under XDG_DATA_HOME and
+# recent-model/locks under XDG_STATE_HOME. Shared across parallel runs these
+# contend and mix sessions, so each target repo gets its own, inside the
+# gitignored .ralph/. Config (~/.config/opencode) stays shared. auth.json and
+# the downloaded-tools bin/ are symlinked to the user's real data dir so login
+# and token refresh stay in one place and no secret is copied into the repo.
+OPENCODE_XDG_DATA=""
+OPENCODE_XDG_STATE=""
+
+prepare_opencode_data_dir() {
+  [ "$TOOL" = "opencode" ] || return 0
+  local real_data="${XDG_DATA_HOME:-$HOME/.local/share}/opencode"
+  local real_state="${XDG_STATE_HOME:-$HOME/.local/state}/opencode"
+  OPENCODE_XDG_DATA="$METADATA_DIR/opencode/data"
+  OPENCODE_XDG_STATE="$METADATA_DIR/opencode/state"
+  mkdir -p "$OPENCODE_XDG_DATA/opencode" "$OPENCODE_XDG_STATE/opencode"
+
+  local item
+  for item in auth.json bin; do
+    local src="$real_data/$item" dst="$OPENCODE_XDG_DATA/opencode/$item"
+    [ -e "$src" ] || continue
+    if [ -L "$dst" ] || [ ! -e "$dst" ]; then
+      ln -sfn "$src" "$dst"
+    fi
+  done
+  if [ ! -e "$real_data/auth.json" ]; then
+    echo "[Ralph][warn] No OpenCode auth at $real_data/auth.json; providers needing login may fail (run 'opencode auth login')." >&2
+  fi
+  # Seed recent-model list once so a run without --model has a default.
+  if [ -f "$real_state/model.json" ] && [ ! -f "$OPENCODE_XDG_STATE/opencode/model.json" ]; then
+    cp "$real_state/model.json" "$OPENCODE_XDG_STATE/opencode/model.json" 2>/dev/null || true
+  fi
+  echo "[Ralph] OpenCode data dir: $METADATA_DIR/opencode (per-repo, gitignored)" >&2
+}
+
+# Run opencode with this repo's data/state dirs. Usage: run_opencode <args...>
+run_opencode() {
+  if [ -n "$OPENCODE_XDG_DATA" ]; then
+    XDG_DATA_HOME="$OPENCODE_XDG_DATA" XDG_STATE_HOME="$OPENCODE_XDG_STATE" opencode "$@"
+  else
+    opencode "$@"
   fi
 }
 
@@ -1758,7 +1803,7 @@ run_iteration() {
     if [[ -n "$iteration_model" ]]; then
       model_flag="--model $iteration_model"
     fi
-    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | opencode run $model_flag 2>&1 | tee >(cat >&2)) || true
+    OUTPUT=$(cd "$TARGET_REPO_ROOT" && printf "%s" "$merged_prompt" | run_opencode run $model_flag 2>&1 | tee >(cat >&2)) || true
   fi
 
   if command -v jq >/dev/null 2>&1 && [ -f "$PRD_FILE" ]; then
@@ -1906,7 +1951,7 @@ preflight_tool_check() {
   fi
 
   local probe_output
-  probe_output=$(cd "$TARGET_REPO_ROOT" && printf "Reply with exactly: RALPH_OK" | timeout 60 opencode run $model_flag 2>&1) || true
+  probe_output=$(cd "$TARGET_REPO_ROOT" && printf "Reply with exactly: RALPH_OK" | XDG_DATA_HOME="${OPENCODE_XDG_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}}" XDG_STATE_HOME="${OPENCODE_XDG_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}}" timeout 60 opencode run $model_flag 2>&1) || true
 
   if echo "$probe_output" | grep -q "RALPH_OK"; then
     echo "[Ralph] Pre-flight passed." >&2
@@ -1967,6 +2012,7 @@ main() {
   fi
   pin_target_repo_root
   ensure_ralph_dir_gitignored
+  prepare_opencode_data_dir
   acquire_run_lock
   trap on_exit EXIT
   snapshot_runner_tree
