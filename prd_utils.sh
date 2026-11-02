@@ -80,6 +80,43 @@ archive_prd_if_changed() {
   echo "$prd_hash" > "$LAST_PRD_HASH_FILE"
 }
 
+# ── PRD identity guard (#26) ───────────────────────────────────────
+# Record the PRD identity (project + branchName) at run start; before every
+# iteration, abort if tasks.json now belongs to a different PRD. Normal edits
+# (passes flags, new bugfix tasks) do not change identity and are allowed.
+RUN_PRD_PROJECT=""
+RUN_PRD_BRANCH=""
+
+_prd_identity_field() {
+  jq -r --arg f "$1" '.[$f] // ""' "$PRD_FILE" 2>/dev/null || echo "<unreadable>"
+}
+
+record_prd_identity() {
+  command -v jq >/dev/null 2>&1 || return 0
+  [ -f "$PRD_FILE" ] || return 0
+  RUN_PRD_PROJECT=$(_prd_identity_field project)
+  RUN_PRD_BRANCH=$(_prd_identity_field branchName)
+  echo "[Ralph] PRD identity: project='$RUN_PRD_PROJECT' branch='$RUN_PRD_BRANCH'" >&2
+}
+
+assert_prd_identity() {
+  command -v jq >/dev/null 2>&1 || return 0
+  if [ ! -f "$PRD_FILE" ]; then
+    echo "[Ralph][error] tasks.json disappeared mid-run: $PRD_FILE" >&2
+    notify_and_exit 1 "Ralph: PRD Missing" "tasks.json disappeared mid-run: $PRD_FILE" 1
+  fi
+  local project branch
+  project=$(_prd_identity_field project)
+  branch=$(_prd_identity_field branchName)
+  if [ "$project" != "$RUN_PRD_PROJECT" ] || [ "$branch" != "$RUN_PRD_BRANCH" ]; then
+    echo "[Ralph][error] tasks.json was swapped mid-run ($PRD_FILE)." >&2
+    echo "[Ralph][error]   was: project='$RUN_PRD_PROJECT' branch='$RUN_PRD_BRANCH'" >&2
+    echo "[Ralph][error]   now: project='$project' branch='$branch'" >&2
+    notify_and_exit 1 "Ralph: PRD Swapped Mid-Run" \
+      "tasks.json changed PRD mid-run.\nWas: $RUN_PRD_PROJECT ($RUN_PRD_BRANCH)\nNow: $project ($branch)" 1
+  fi
+}
+
 init_progress_file() {
   if [ -f "$PROGRESS_FILE" ]; then
     return

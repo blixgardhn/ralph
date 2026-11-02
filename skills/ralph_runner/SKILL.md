@@ -19,8 +19,9 @@ Run Ralph from a sibling checkout (`../ralph`) against the current repo. Use whe
 1) Stay at the target repo root (the repo you want to modify).
 2) Run Ralph with the sibling runner:
    ```bash
-   TARGET_REPO="$PWD" ../ralph/ralph.sh --tool opencode 1
+   ../ralph/ralph.sh --tool opencode 1
    ```
+   - The target is `$PWD` or `--target-repo <path>`. `TARGET_REPO` env vars are ignored.
    - Replace `1` to change max iterations if needed.
    - Pass `--tool amp` or `--tool claude` to switch tools.
    - Pass `--host-mode` to skip container wrapping when tools are installed locally.
