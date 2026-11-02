@@ -471,7 +471,7 @@ build_static_prompt() {
   # to catch variant phrasings.
   local tasks_file="$TARGET_REPO_ROOT/.ralph/tasks.json"
   if [ -f "$tasks_file" ] && grep -qiE "dev-browser|browser" "$tasks_file" 2>/dev/null; then
-    browser_ref="Browser AC present in this PRD. Read \`$browser_file\` for the exact handling pattern (dev-browser skill vs. manual verification block + STOP)."
+    browser_ref="Browser AC present in this PRD. Read \`$browser_file\` for the exact handling pattern. If no dev-browser skill is available, DEFER the check to \`.ralph/browser-checks.md\`, mark the task passes:true, and emit TASK_COMPLETE — never STOP the loop for a browser AC."
     echo "[Ralph] Browser verification reference included (browser AC detected)" >&2
   else
     browser_ref="(No browser ACs in this PRD — section omitted.)"
@@ -1286,6 +1286,37 @@ log_iteration_cost() {
     >> "$cost_log" 2>/dev/null || true
 }
 
+# Summarize any deferred browser checks recorded during the run so the user can
+# perform them manually after the loop ends. Called on every terminal exit path.
+# Prints only when .ralph/browser-checks.md contains PENDING entries.
+summarize_browser_checks() {
+  local checks_file="$TARGET_REPO_ROOT/.ralph/browser-checks.md"
+  [ -f "$checks_file" ] || return 0
+
+  local pending
+  pending=$(grep -c "Status: PENDING" "$checks_file" 2>/dev/null || echo 0)
+  if [ "${pending:-0}" -lt 1 ] 2>/dev/null; then
+    return 0
+  fi
+
+  echo "" >&2
+  echo "===============================================================" >&2
+  echo "  Ralph: $pending browser check(s) deferred for manual verification" >&2
+  echo "===============================================================" >&2
+  echo "These tasks committed non-browser work but need a human visual check." >&2
+  echo "File: $checks_file" >&2
+  echo "" >&2
+  # Print each PENDING block's heading + fields for a quick at-a-glance list.
+  awk '
+    /^## / { hdr=$0; buf=hdr; inblock=1; next }
+    inblock && /^## / { inblock=0 }
+    inblock { buf=buf ORS $0 }
+    /Status: PENDING/ { if (inblock) print buf ORS }
+  ' "$checks_file" >&2 2>/dev/null || true
+  echo "After verifying each, set its Status to DONE in the file above." >&2
+  echo "===============================================================" >&2
+}
+
 run_iteration() {
   local iteration="$1"
   local iter_start
@@ -1309,6 +1340,7 @@ run_iteration() {
 
   if [ -z "$SELECTED_TASK_ID" ]; then
     echo "[Ralph] No unblocked tasks available; stopping." >&2
+    summarize_browser_checks
     notify_and_exit 0 "Ralph: No Unblocked Tasks" "No unblocked tasks available; all tasks may be done or blocked.\nStopping at iteration $iteration." 0
   fi
 
@@ -1394,6 +1426,7 @@ run_iteration() {
     loop_elapsed=$((iter_end - LOOP_START_SECS))
     log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "complete"
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
+    summarize_browser_checks
     notify_and_exit 0 "Ralph: All Tasks Complete" "All tasks completed at iteration $iteration of $MAX_ITERATIONS.\n<b>Iteration time:</b> $(format_duration "$elapsed")\n<b>Total time:</b> $(format_duration "$loop_elapsed")" 0
   fi
 
@@ -1407,6 +1440,7 @@ run_iteration() {
     loop_elapsed=$((iter_end - LOOP_START_SECS))
     log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "stopped"
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
+    summarize_browser_checks
     notify_and_exit 0 "Ralph: Stopped" "Agent requested stop at iteration $iteration of $MAX_ITERATIONS.\n<b>Iteration time:</b> $(format_duration "$elapsed")\n<b>Total time:</b> $(format_duration "$loop_elapsed")" 1
   fi
 
@@ -1430,6 +1464,7 @@ run_iteration() {
     loop_elapsed=$((iter_end - LOOP_START_SECS))
     log_iteration_cost "$iteration" "$SELECTED_TASK_ID" "$iteration_model" "$initial_tokens" "$estimated_tokens" "$expansion_factor" "$elapsed" "error"
     echo "[Ralph][timer] iteration=$iteration duration=$(format_duration "$elapsed") total_elapsed=$(format_duration "$loop_elapsed")" >&2
+    summarize_browser_checks
     notify_and_exit 1 "Ralph: Error" "Unrecoverable error at iteration $iteration. Check output for details." 1
   fi
 
@@ -1556,6 +1591,7 @@ run_iterations() {
   done
 
   echo "Reached max iterations ($MAX_ITERATIONS) without completion."
+  summarize_browser_checks
   notify_and_exit 1 "Ralph: Max Iterations" "Reached max iterations ($MAX_ITERATIONS) without completing all tasks." 1
 }
 

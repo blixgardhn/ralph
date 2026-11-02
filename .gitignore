@@ -7,6 +7,9 @@ progress.txt
 # Local Ralph run state
 .ralph/
 
+# NuGet caches from containerized dotnet runs
+.nuget-cache*/
+
 # Archive is optional to commit
 # archive/
 

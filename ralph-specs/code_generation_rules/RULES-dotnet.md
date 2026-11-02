@@ -132,7 +132,7 @@ Build with: `DOCKER_BUILDKIT=1 docker compose build`.
 
 ### Log-level discipline
 
-Apply log levels per the org standard (`int-apps-k8s/docs/LOGGING.md`, based on Microsoft's `LogLevel` enum). Misusing levels floods production logs and obscures real issues. The common failure mode is emitting debug-detail messages at `Information`, drowning genuine operational signal.
+Apply log levels per the org standard (`int-platform-k8s/docs/LOGGING.md`, based on Microsoft's `LogLevel` enum). Misusing levels floods production logs and obscures real issues. The common failure mode is emitting debug-detail messages at `Information`, drowning genuine operational signal.
 
 | Level | Use for | NOT for |
 |-------|---------|---------|
