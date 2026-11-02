@@ -12,7 +12,7 @@ Run Ralph from a sibling checkout (`../ralph`) against the current repo. Use whe
 
 - The Ralph repo is checked out at `../ralph` relative to the target repo root.
 - `../ralph/ralph.sh` exists and is executable; it depends on `prompt.md` in the same directory.
-- Do **not** copy or stage files from `../ralph` into the target repo. Only target-repo changes (including `.ralph/*` outputs) may be staged/committed.
+- Do **not** copy or stage files from `../ralph` into the target repo. Only target-repo source changes may be staged/committed; `.ralph/` is gitignored run state and is never committed.
 
 ## How to Run
 
@@ -28,5 +28,5 @@ Run Ralph from a sibling checkout (`../ralph`) against the current repo. Use whe
 
 ## Notes
 
-- Ralph writes metadata to `.ralph/` inside the target repo (e.g., `tasks.json`, `progress.md`). These are safe to stage/commit if desired; do **not** add anything from `../ralph`.
+- Ralph keeps all state that persists between runs in `.ralph/` inside the target repo (e.g., `tasks.json`, `progress.md`, `run.lock`, `cost.jsonl`). Ralph ensures `.ralph/` is in the target's `.gitignore`; never commit it, and do **not** add anything from `../ralph`.
 - If `../ralph` is missing, stop and ask for the path to the Ralph checkout instead of copying files.

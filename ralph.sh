@@ -467,6 +467,28 @@ check_runner_tree_unchanged() {
   RUNNER_TREE_BASELINE="$now"
 }
 
+# All state that must survive between runs lives in the target's .ralph/
+# (tasks, progress, lock, hashes, cost log, browser checks). It is local
+# run state and must never be committed: ensure the target ignores it.
+ensure_ralph_dir_gitignored() {
+  git -C "$TARGET_REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  if ! git -C "$TARGET_REPO_ROOT" check-ignore -q --no-index .ralph/ 2>/dev/null; then
+    local gi="$TARGET_REPO_ROOT/.gitignore"
+    if [ -s "$gi" ] && [ -n "$(tail -c1 "$gi")" ]; then
+      printf '\n' >> "$gi"
+    fi
+    printf '# Ralph local run state (per-repo, never commit)\n.ralph/\n' >> "$gi"
+    echo "[Ralph] Added .ralph/ to $gi (run state must not be committed)" >&2
+  fi
+  local tracked
+  tracked=$(git -C "$TARGET_REPO_ROOT" ls-files -- .ralph | head -20)
+  if [ -n "$tracked" ]; then
+    echo "[Ralph][warn] .ralph/ files are tracked in git despite being run state:" >&2
+    printf '%s\n' "$tracked" | sed 's/^/  /' >&2
+    echo "[Ralph][warn] Untrack them (keeps files on disk): git -C \"$TARGET_REPO_ROOT\" rm -r --cached .ralph" >&2
+  fi
+}
+
 on_exit() {
   cleanup_sidecars || true
   release_run_lock || true
@@ -1944,6 +1966,7 @@ main() {
     echo "[Ralph] Loaded private org overlay ($private_env): ${LOADED_ENV_NAMES:-<no changes>}" >&2
   fi
   pin_target_repo_root
+  ensure_ralph_dir_gitignored
   acquire_run_lock
   trap on_exit EXIT
   snapshot_runner_tree
