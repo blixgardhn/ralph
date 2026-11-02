@@ -329,6 +329,15 @@ docker build \
   -f ralph-specs/resources/Dockerfile.template .
 ```
 
+**Docker preflight.** Before starting sidecars, Ralph checks free disk on Docker's data root. Below `RALPH_MIN_DISK_GB` (default `5`) it prunes according to `RALPH_DOCKER_PRUNE`: `build-cache` (default, `docker builder prune -f`), `system` (`docker system prune -f`), or `off` (warn only). Image pulls retry up to `RALPH_PULL_RETRIES` (default `3`) times with exponential backoff on transient registry errors (`connection reset`, `unexpected EOF`, timeouts, 502/503).
+
+### Run isolation
+
+- **Target resolution:** `--target-repo <path>` or `$PWD`. `TARGET_REPO`/`target_repo` environment variables are ignored (a warning is printed). The resolved `TARGET_REPO_ROOT` is logged and frozen (`readonly`) for the run; `.env` cannot change it.
+- **Run lock:** `.ralph/run.lock` (PID + target) prevents two runners on the same `.ralph/`. A lock whose PID is dead is cleared automatically.
+- **PRD swap guard:** the PRD's `project` and `branchName` are recorded at start; if `tasks.json` changes to a different PRD mid-run, Ralph aborts naming old and new. `passes` updates and added tasks are fine.
+- **Runner tree is read-only:** Ralph warns if `$RALPH_ROOT` is dirty at startup and flags (and logs to `suggested_improvements.md`) any iteration that writes under it.
+
 ### Organization-specific settings
 
 If you're running Ralph inside a corporate environment, you may need to configure some or all of the following:

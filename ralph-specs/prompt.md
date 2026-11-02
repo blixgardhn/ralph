@@ -249,6 +249,8 @@ Keep entries under 30 lines. If you need to record extended output, save to `.ra
 3. Commit when the change is complete; verification is opt-in per the §Verification Policy, not a per-commit gate.
 4. Signal with `<promise>` tags: TASK_COMPLETE, COMPLETE, STOP, or ERROR.
 5. Never emit `exit`.
+6. **Never write under `$RALPH_ROOT`** (the runner directory). It is read-only at runtime. Caches (NuGet, npm, pip) go in named Docker volumes or under the target repo's `.ralph/`; never bind-mount a host path inside `$RALPH_ROOT`.
+7. Only touch the current target repo and its `.ralph/tasks.json`. Never edit another repo's `.ralph/` or replace the PRD's `project`/`branchName` — the runner aborts if the PRD identity changes mid-run.
 
 These instructions are complete. Do not re-read AGENTS.md or prompt.md from disk — they are already provided above.
 

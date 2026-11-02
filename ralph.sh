@@ -41,6 +41,10 @@ RESOLVED_PROMPT_FILE=""
 STATIC_PROMPT="" # built once in main, reused every iteration
 
 TARGET_REPO_ARG=""
+# Capture (for a warning only) and then drop any inherited target-repo env vars
+# so nothing downstream can resolve the target from the environment (#24).
+TARGET_REPO_ENV_AT_START="${TARGET_REPO:-${target_repo:-}}"
+unset TARGET_REPO target_repo
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
@@ -211,20 +215,23 @@ set_paths() {
 
   PROMPT_FILE="$RALPH_ROOT/ralph-specs/prompt.md"
 
+  # Target resolution: --target-repo or $PWD only. Environment variables
+  # (TARGET_REPO / target_repo) are deliberately ignored: a stale export once
+  # silently redirected a run into a different repo (#24).
   local target_repo_input
   if [ -n "$TARGET_REPO_ARG" ]; then
     target_repo_input="$TARGET_REPO_ARG"
-  elif [ -n "${TARGET_REPO:-}" ]; then
-    target_repo_input="$TARGET_REPO"
-  elif [ -n "${target_repo:-}" ]; then
-    target_repo_input="$target_repo"
   else
     target_repo_input="$invocation_pwd"
   fi
+  if [ -z "$TARGET_REPO_ARG" ] && [ -n "${TARGET_REPO_ENV_AT_START:-}" ] \
+     && [ "$TARGET_REPO_ENV_AT_START" != "$invocation_pwd" ]; then
+    echo "[Ralph][warn] Ignoring TARGET_REPO from environment ($TARGET_REPO_ENV_AT_START); using \$PWD. Pass --target-repo to override." >&2
+  fi
 
   if [ -z "$target_repo_input" ]; then
-    echo "TARGET_REPO is empty; specify --target-repo or set TARGET_REPO." >&2
-    notify_and_exit 1 "Ralph: Config Error" "TARGET_REPO is empty; specify --target-repo or set TARGET_REPO." 0
+    echo "Target repo is empty; specify --target-repo or run from the target repo." >&2
+    notify_and_exit 1 "Ralph: Config Error" "Target repo is empty; specify --target-repo or run from the target repo." 0
   fi
 
   if ! TARGET_REPO="$(cd "$target_repo_input" 2>/dev/null && pwd)"; then
@@ -241,9 +248,96 @@ set_paths() {
   esac
 
   TARGET_REPO_ROOT="$TARGET_REPO"
+  PINNED_TARGET_REPO_ROOT="$TARGET_REPO"
   export TARGET_REPO_ROOT
 
   configure_prd_paths "$TARGET_REPO_ROOT"
+}
+
+# Re-assert the target after sourcing .env / private overlay (which could try
+# to redefine it), then freeze it for the rest of the run (#25).
+pin_target_repo_root() {
+  if [ "${TARGET_REPO_ROOT:-}" != "$PINNED_TARGET_REPO_ROOT" ]; then
+    echo "[Ralph][warn] TARGET_REPO_ROOT was changed by sourced env ('${TARGET_REPO_ROOT:-}'); restoring $PINNED_TARGET_REPO_ROOT" >&2
+  fi
+  TARGET_REPO_ROOT="$PINNED_TARGET_REPO_ROOT"
+  TARGET_REPO="$PINNED_TARGET_REPO_ROOT"
+  readonly TARGET_REPO_ROOT TARGET_REPO PINNED_TARGET_REPO_ROOT
+  export TARGET_REPO_ROOT
+  configure_prd_paths "$TARGET_REPO_ROOT"
+  echo "[Ralph] Target pinned: TARGET_REPO_ROOT=$TARGET_REPO_ROOT" >&2
+}
+
+# ── Run lock (#27a) ────────────────────────────────────────────────
+RUN_LOCK_FILE=""
+RUN_LOCK_HELD=false
+
+acquire_run_lock() {
+  RUN_LOCK_FILE="$METADATA_DIR/run.lock"
+  local attempt
+  for attempt in 1 2; do
+    if ( set -o noclobber; printf 'pid=%s\ntarget=%s\nstarted=%s\n' \
+          "$$" "$TARGET_REPO_ROOT" "$(date -u --iso-8601=seconds)" > "$RUN_LOCK_FILE" ) 2>/dev/null; then
+      RUN_LOCK_HELD=true
+      echo "[Ralph] Acquired run lock $RUN_LOCK_FILE (pid $$)" >&2
+      return 0
+    fi
+    local other_pid
+    other_pid=$(sed -n 's/^pid=//p' "$RUN_LOCK_FILE" 2>/dev/null | head -1)
+    if [ -n "$other_pid" ] && kill -0 "$other_pid" 2>/dev/null; then
+      echo "[Ralph][error] Another Ralph run (pid $other_pid) holds $RUN_LOCK_FILE." >&2
+      cat "$RUN_LOCK_FILE" >&2 2>/dev/null || true
+      notify_and_exit 1 "Ralph: Already Running" "Another Ralph run (pid $other_pid) is active on $TARGET_REPO_ROOT." 0
+    fi
+    echo "[Ralph] Clearing stale run lock (pid ${other_pid:-?} not running)" >&2
+    rm -f "$RUN_LOCK_FILE"
+  done
+  notify_and_exit 1 "Ralph: Lock Error" "Could not acquire $RUN_LOCK_FILE" 0
+}
+
+release_run_lock() {
+  if [ "$RUN_LOCK_HELD" = true ] && [ -n "$RUN_LOCK_FILE" ]; then
+    if [ "$(sed -n 's/^pid=//p' "$RUN_LOCK_FILE" 2>/dev/null | head -1)" = "$$" ]; then
+      rm -f "$RUN_LOCK_FILE"
+    fi
+    RUN_LOCK_HELD=false
+  fi
+}
+
+# ── Runner tree immutability (#27b) ────────────────────────────────
+RUNNER_TREE_BASELINE=""
+
+runner_tree_status() {
+  git -C "$RALPH_ROOT" status --porcelain --untracked-files=all --ignored 2>/dev/null || true
+}
+
+snapshot_runner_tree() {
+  git -C "$RALPH_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  RUNNER_TREE_BASELINE=$(runner_tree_status)
+  if [ -n "$RUNNER_TREE_BASELINE" ]; then
+    echo "[Ralph][warn] Runner tree $RALPH_ROOT is dirty at startup:" >&2
+    printf '%s\n' "$RUNNER_TREE_BASELINE" | head -20 >&2
+  fi
+}
+
+check_runner_tree_unchanged() {
+  local iteration="$1"
+  git -C "$RALPH_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  local now new_entries
+  now=$(runner_tree_status)
+  [ "$now" = "$RUNNER_TREE_BASELINE" ] && return 0
+  new_entries=$(comm -13 <(printf '%s\n' "$RUNNER_TREE_BASELINE" | sort) <(printf '%s\n' "$now" | sort))
+  [ -z "$new_entries" ] && return 0
+  echo "[Ralph][WARN] Iteration $iteration wrote under RALPH_ROOT ($RALPH_ROOT) — the runner tree must stay immutable:" >&2
+  printf '%s\n' "$new_entries" | head -20 >&2
+  append_suggestion_entry "$iteration" "runner-tree-write" \
+    "Iteration wrote under RALPH_ROOT: $(printf '%s' "$new_entries" | tr '\n' ' ' | cut -c1-300). Put caches in named docker volumes or the target's .ralph/."
+  RUNNER_TREE_BASELINE="$now"
+}
+
+on_exit() {
+  cleanup_sidecars || true
+  release_run_lock || true
 }
 
 require_agents_file() {
@@ -689,6 +783,79 @@ inline_keyfiles() {
   echo "$result"
 }
 
+# ── Docker preflight (#22) ─────────────────────────────────────────
+# RALPH_MIN_DISK_GB: free-space threshold on Docker's data root (default 5).
+# RALPH_DOCKER_PRUNE: "build-cache" (default) prunes BuildKit cache only;
+#   "system" runs `docker system prune -f`; "off" only warns.
+RALPH_MIN_DISK_GB="${RALPH_MIN_DISK_GB:-5}"
+RALPH_DOCKER_PRUNE="${RALPH_DOCKER_PRUNE:-build-cache}"
+RALPH_PULL_RETRIES="${RALPH_PULL_RETRIES:-3}"
+
+_docker_free_gb() {
+  local root
+  root=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)
+  [ -n "$root" ] && [ -d "$root" ] || root="/"
+  df -Pk "$root" 2>/dev/null | awk 'NR==2 {print int($4/1048576)}'
+}
+
+preflight_docker_disk() {
+  command -v docker >/dev/null 2>&1 || return 0
+  docker info >/dev/null 2>&1 || return 0
+  local free
+  free=$(_docker_free_gb)
+  [ -n "$free" ] || return 0
+  if [ "$free" -ge "$RALPH_MIN_DISK_GB" ]; then
+    echo "[Ralph][preflight] Docker disk free: ${free}GB (threshold ${RALPH_MIN_DISK_GB}GB)" >&2
+    return 0
+  fi
+  echo "[Ralph][preflight][WARN] Docker disk free ${free}GB < ${RALPH_MIN_DISK_GB}GB." >&2
+  docker system df >&2 2>/dev/null || true
+  case "$RALPH_DOCKER_PRUNE" in
+    system)
+      echo "[Ralph][preflight] Running docker system prune -f (RALPH_DOCKER_PRUNE=system)" >&2
+      docker system prune -f >&2 || true ;;
+    off)
+      echo "[Ralph][preflight] Auto-prune disabled (RALPH_DOCKER_PRUNE=off). Consider: docker builder prune -f" >&2
+      return 0 ;;
+    *)
+      echo "[Ralph][preflight] Pruning build cache (docker builder prune -f)" >&2
+      docker builder prune -f >&2 || true ;;
+  esac
+  free=$(_docker_free_gb)
+  if [ -n "$free" ] && [ "$free" -lt "$RALPH_MIN_DISK_GB" ]; then
+    echo "[Ralph][preflight][WARN] Still only ${free}GB free after prune. Builds may fail; try RALPH_DOCKER_PRUNE=system or free disk manually." >&2
+  else
+    echo "[Ralph][preflight] Docker disk free after prune: ${free}GB" >&2
+  fi
+}
+
+# Pull an image if absent, retrying transient registry errors with
+# exponential backoff (2s, 4s, 8s...). Non-transient failures return at once.
+docker_pull_with_retry() {
+  local image="$1"
+  docker image inspect "$image" >/dev/null 2>&1 && return 0
+  local attempt=1 delay=2 out
+  while :; do
+    if out=$(docker pull "$image" 2>&1); then
+      return 0
+    fi
+    if ! printf '%s' "$out" | grep -qiE 'connection reset|unexpected EOF|i/o timeout|TLS handshake timeout|503 Service Unavailable|502 Bad Gateway|connection refused'; then
+      echo "[Ralph][docker] Pull of $image failed (non-transient):" >&2
+      printf '%s\n' "$out" | tail -3 >&2
+      return 1
+    fi
+    if [ "$attempt" -ge "$RALPH_PULL_RETRIES" ]; then
+      echo "[Ralph][docker] Pull of $image failed after $attempt attempts:" >&2
+      printf '%s\n' "$out" | tail -3 >&2
+      return 1
+    fi
+    echo "[Ralph][docker] Transient pull error for $image (attempt $attempt/$RALPH_PULL_RETRIES); retrying in ${delay}s" >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+    delay=$((delay * 2))
+  done
+}
+
 # ── Sidecar containers ──────────────────────────────────────────────
 # Long-lived per-repo containers reused across iterations AND across
 # ralph.sh sessions. Named deterministically from the target repo path so
@@ -783,6 +950,7 @@ _start_sidecar_if_needed() {
   fi
 
   # Fresh create.
+  docker_pull_with_retry "$image" || true
   if docker run -d --name "$name" --memory=4g --cpus=2 \
       -v "$TARGET_REPO_ROOT":/work -w /work \
       "${extra[@]}" \
@@ -969,6 +1137,7 @@ check_sidecars() {
       ralph-sidecar-dotnet-*) image="mcr.microsoft.com/dotnet/sdk:8.0" ;;
     esac
     docker rm -f "$name" >/dev/null 2>&1 || true
+    docker_pull_with_retry "$image" || true
     docker run -d --name "$name" --memory=4g --cpus=2 \
       -v "$TARGET_REPO_ROOT":/work -w /work \
       "$image" sleep infinity >/dev/null 2>&1 || \
@@ -1322,6 +1491,9 @@ run_iteration() {
   local iter_start
   iter_start=$(date +%s)
 
+  # Abort if tasks.json was swapped for another PRD since the run started (#26)
+  assert_prd_identity
+
   # Verify sidecars are alive before starting work
   check_sidecars
 
@@ -1512,6 +1684,7 @@ run_iteration() {
     remaining_tasks=0
   fi
   completed_tasks=$(compute_completed_tasks "$TOTAL_TASKS" "$remaining_tasks")
+  check_runner_tree_unchanged "$iteration"
   # Determine outcome for cost log.
   # An iteration counts as complete when EITHER the agent emitted
   # <promise>TASK_COMPLETE</promise> OR the task's passes field flipped to
@@ -1619,6 +1792,10 @@ main() {
     loaded_vars=$(grep -E '^[A-Z_]+=' "$private_env" 2>/dev/null | sed 's/#.*//' | grep -E '^[A-Z_]+=' | cut -d= -f1 | tr '\n' ' ')
     echo "[Ralph] Loaded private org overlay ($private_env): $loaded_vars" >&2
   fi
+  pin_target_repo_root
+  acquire_run_lock
+  trap on_exit EXIT
+  snapshot_runner_tree
   require_runner_specs_dir || true
   require_agents_file || true
   require_prompt_file || true
@@ -1633,6 +1810,7 @@ main() {
   fi
   enforce_feature_branch
   archive_prd_if_changed
+  record_prd_identity
   init_progress_file
   init_suggestions_file
   validate_prd
@@ -1645,9 +1823,10 @@ main() {
   fi
   # Auto-enable sidecar mode when Docker is available (opt-out via --no-sidecar)
   auto_enable_sidecar_mode
+  # Disk-space preflight before pulling/starting images (#22)
+  preflight_docker_disk
   # Launch sidecar containers (parallel start + background cache warming)
   launch_sidecars
-  trap cleanup_sidecars EXIT
   # Verify the AI tool is reachable before burning full iterations
   preflight_tool_check
   run_iterations
