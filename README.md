@@ -337,6 +337,7 @@ docker build \
 - **Run lock:** `.ralph/run.lock` (PID + target) prevents two runners on the same `.ralph/`. A lock whose PID is dead is cleared automatically.
 - **PRD swap guard:** the PRD's `project` and `branchName` are recorded at start; if `tasks.json` changes to a different PRD mid-run, Ralph aborts naming old and new. `passes` updates and added tasks are fine.
 - **Runner tree is read-only:** Ralph warns if `$RALPH_ROOT` is dirty at startup and flags (and logs to `suggested_improvements.md`) any iteration that writes under it.
+- **Parallel sessions:** multiple Ralph runs on *different* target repos are supported concurrently from one runner checkout. Per-run state (`.ralph/`, lock, sidecars, cache volumes) is keyed by target repo. The run lock's stale-check is serialized with `flock`, so racing runners on the same repo yield exactly one winner. Runner-tree checks are read-only (`GIT_OPTIONAL_LOCKS=0`); a detected write may come from another session and is reported as such. Docker prunes are serialized host-wide (`$XDG_RUNTIME_DIR/ralph-docker-prune.lock`) and skipped if another session already freed space; `system` prune excludes Ralph sidecars (`label ralph.sidecar`) and never touches volumes.
 
 ### Organization-specific settings
 

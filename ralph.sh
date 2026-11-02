@@ -272,27 +272,60 @@ pin_target_repo_root() {
 RUN_LOCK_FILE=""
 RUN_LOCK_HELD=false
 
-acquire_run_lock() {
-  RUN_LOCK_FILE="$METADATA_DIR/run.lock"
-  local attempt
-  for attempt in 1 2; do
-    if ( set -o noclobber; printf 'pid=%s\ntarget=%s\nstarted=%s\n' \
-          "$$" "$TARGET_REPO_ROOT" "$(date -u --iso-8601=seconds)" > "$RUN_LOCK_FILE" ) 2>/dev/null; then
-      RUN_LOCK_HELD=true
-      echo "[Ralph] Acquired run lock $RUN_LOCK_FILE (pid $$)" >&2
-      return 0
-    fi
-    local other_pid
+# Parallel-safe: the whole check-stale/remove/create sequence runs inside a
+# short-lived subshell holding an exclusive flock on run.lock.guard, so two
+# runners racing on the same stale lock cannot both "win". The flock fd is
+# confined to that subshell and never inherited by agent/docker children.
+# Runs on *different* target repos use different .ralph/ dirs and never contend.
+_try_create_run_lock() {
+  # Returns 0 = acquired, 2 = held by a live pid. Must be called under the guard.
+  local other_pid
+  if [ -f "$RUN_LOCK_FILE" ]; then
     other_pid=$(sed -n 's/^pid=//p' "$RUN_LOCK_FILE" 2>/dev/null | head -1)
     if [ -n "$other_pid" ] && kill -0 "$other_pid" 2>/dev/null; then
-      echo "[Ralph][error] Another Ralph run (pid $other_pid) holds $RUN_LOCK_FILE." >&2
-      cat "$RUN_LOCK_FILE" >&2 2>/dev/null || true
-      notify_and_exit 1 "Ralph: Already Running" "Another Ralph run (pid $other_pid) is active on $TARGET_REPO_ROOT." 0
+      return 2
     fi
     echo "[Ralph] Clearing stale run lock (pid ${other_pid:-?} not running)" >&2
     rm -f "$RUN_LOCK_FILE"
-  done
-  notify_and_exit 1 "Ralph: Lock Error" "Could not acquire $RUN_LOCK_FILE" 0
+  fi
+  printf 'pid=%s\ntarget=%s\nhost=%s\nstarted=%s\n' \
+    "$$" "$TARGET_REPO_ROOT" "$(hostname 2>/dev/null || echo ?)" "$(date -u --iso-8601=seconds)" \
+    > "$RUN_LOCK_FILE.tmp.$$" && mv -f "$RUN_LOCK_FILE.tmp.$$" "$RUN_LOCK_FILE"
+}
+
+acquire_run_lock() {
+  RUN_LOCK_FILE="$METADATA_DIR/run.lock"
+  local rc=0
+  if command -v flock >/dev/null 2>&1; then
+    ( flock -w 30 9 || exit 3; _try_create_run_lock ) 9>"$RUN_LOCK_FILE.guard" || rc=$?
+  else
+    # No flock: mkdir is atomic, use it as the guard.
+    local guard_dir="$RUN_LOCK_FILE.guard.d" waited=0
+    until mkdir "$guard_dir" 2>/dev/null; do
+      sleep 1; waited=$((waited + 1))
+      [ "$waited" -ge 30 ] && { rc=3; break; }
+    done
+    if [ "$rc" -eq 0 ]; then
+      _try_create_run_lock || rc=$?
+      rmdir "$guard_dir" 2>/dev/null || true
+    fi
+  fi
+  case "$rc" in
+    0)
+      RUN_LOCK_HELD=true
+      echo "[Ralph] Acquired run lock $RUN_LOCK_FILE (pid $$)" >&2
+      ;;
+    2)
+      local other_pid
+      other_pid=$(sed -n 's/^pid=//p' "$RUN_LOCK_FILE" 2>/dev/null | head -1)
+      echo "[Ralph][error] Another Ralph run (pid $other_pid) holds $RUN_LOCK_FILE." >&2
+      cat "$RUN_LOCK_FILE" >&2 2>/dev/null || true
+      notify_and_exit 1 "Ralph: Already Running" "Another Ralph run (pid $other_pid) is active on $TARGET_REPO_ROOT." 0
+      ;;
+    *)
+      notify_and_exit 1 "Ralph: Lock Error" "Could not acquire $RUN_LOCK_FILE (guard timeout)" 0
+      ;;
+  esac
 }
 
 release_run_lock() {
@@ -307,8 +340,11 @@ release_run_lock() {
 # ── Runner tree immutability (#27b) ────────────────────────────────
 RUNNER_TREE_BASELINE=""
 
+# GIT_OPTIONAL_LOCKS=0: read-only status. Without it `git status` refreshes
+# $RALPH_ROOT/.git/index (itself a write into the runner) and parallel
+# sessions contend on index.lock.
 runner_tree_status() {
-  git -C "$RALPH_ROOT" status --porcelain --untracked-files=all --ignored 2>/dev/null || true
+  GIT_OPTIONAL_LOCKS=0 git -C "$RALPH_ROOT" status --porcelain --untracked-files=all --ignored 2>/dev/null || true
 }
 
 snapshot_runner_tree() {
@@ -328,10 +364,12 @@ check_runner_tree_unchanged() {
   [ "$now" = "$RUNNER_TREE_BASELINE" ] && return 0
   new_entries=$(comm -13 <(printf '%s\n' "$RUNNER_TREE_BASELINE" | sort) <(printf '%s\n' "$now" | sort))
   [ -z "$new_entries" ] && return 0
-  echo "[Ralph][WARN] Iteration $iteration wrote under RALPH_ROOT ($RALPH_ROOT) — the runner tree must stay immutable:" >&2
+  # RALPH_ROOT is shared by all parallel sessions, so the writer may be another
+  # session; report as "detected during", not "caused by", this iteration.
+  echo "[Ralph][WARN] New writes under RALPH_ROOT ($RALPH_ROOT) detected during iteration $iteration (may originate from a parallel Ralph session). The runner tree must stay immutable:" >&2
   printf '%s\n' "$new_entries" | head -20 >&2
   append_suggestion_entry "$iteration" "runner-tree-write" \
-    "Iteration wrote under RALPH_ROOT: $(printf '%s' "$new_entries" | tr '\n' ' ' | cut -c1-300). Put caches in named docker volumes or the target's .ralph/."
+    "Writes under RALPH_ROOT detected during this iteration (possibly from a parallel session): $(printf '%s' "$new_entries" | tr '\n' ' ' | cut -c1-300). Put caches in named docker volumes or the target's .ralph/."
   RUNNER_TREE_BASELINE="$now"
 }
 
@@ -810,17 +848,36 @@ preflight_docker_disk() {
   fi
   echo "[Ralph][preflight][WARN] Docker disk free ${free}GB < ${RALPH_MIN_DISK_GB}GB." >&2
   docker system df >&2 2>/dev/null || true
-  case "$RALPH_DOCKER_PRUNE" in
-    system)
-      echo "[Ralph][preflight] Running docker system prune -f (RALPH_DOCKER_PRUNE=system)" >&2
-      docker system prune -f >&2 || true ;;
-    off)
-      echo "[Ralph][preflight] Auto-prune disabled (RALPH_DOCKER_PRUNE=off). Consider: docker builder prune -f" >&2
-      return 0 ;;
-    *)
-      echo "[Ralph][preflight] Pruning build cache (docker builder prune -f)" >&2
-      docker builder prune -f >&2 || true ;;
-  esac
+  if [ "$RALPH_DOCKER_PRUNE" = "off" ]; then
+    echo "[Ralph][preflight] Auto-prune disabled (RALPH_DOCKER_PRUNE=off). Consider: docker builder prune -f" >&2
+    return 0
+  fi
+  # Docker is host-global and shared by every parallel Ralph session. Serialize
+  # prunes with a host-wide lock and re-check free space after acquiring it:
+  # if another session just pruned, skip instead of pruning again.
+  local prune_lock="${XDG_RUNTIME_DIR:-/tmp}/ralph-docker-prune.lock"
+  (
+    if command -v flock >/dev/null 2>&1; then
+      flock -w 600 9 || { echo "[Ralph][preflight] Timed out waiting for another session's prune; skipping." >&2; exit 0; }
+    fi
+    local f
+    f=$(_docker_free_gb)
+    if [ -n "$f" ] && [ "$f" -ge "$RALPH_MIN_DISK_GB" ]; then
+      echo "[Ralph][preflight] Another session freed space (${f}GB); skipping prune." >&2
+      exit 0
+    fi
+    case "$RALPH_DOCKER_PRUNE" in
+      system)
+        # Exclude Ralph sidecars (labelled) so a stopped sidecar of a parallel
+        # session is not removed. Volumes are never pruned (no --volumes).
+        echo "[Ralph][preflight] Running docker system prune -f (RALPH_DOCKER_PRUNE=system; sidecars excluded)" >&2
+        docker system prune -f --filter "label!=ralph.sidecar" >&2 || true ;;
+      *)
+        # Only unused build cache; records in use by a parallel build are kept.
+        echo "[Ralph][preflight] Pruning unused build cache (docker builder prune -f)" >&2
+        docker builder prune -f >&2 || true ;;
+    esac
+  ) 9>"$prune_lock"
   free=$(_docker_free_gb)
   if [ -n "$free" ] && [ "$free" -lt "$RALPH_MIN_DISK_GB" ]; then
     echo "[Ralph][preflight][WARN] Still only ${free}GB free after prune. Builds may fail; try RALPH_DOCKER_PRUNE=system or free disk manually." >&2
@@ -951,7 +1008,7 @@ _start_sidecar_if_needed() {
 
   # Fresh create.
   docker_pull_with_retry "$image" || true
-  if docker run -d --name "$name" --memory=4g --cpus=2 \
+  if docker run -d --name "$name" --label ralph.sidecar=1 --memory=4g --cpus=2 \
       -v "$TARGET_REPO_ROOT":/work -w /work \
       "${extra[@]}" \
       "$image" sleep infinity >/dev/null 2>&1; then
@@ -1138,7 +1195,7 @@ check_sidecars() {
     esac
     docker rm -f "$name" >/dev/null 2>&1 || true
     docker_pull_with_retry "$image" || true
-    docker run -d --name "$name" --memory=4g --cpus=2 \
+    docker run -d --name "$name" --label ralph.sidecar=1 --memory=4g --cpus=2 \
       -v "$TARGET_REPO_ROOT":/work -w /work \
       "$image" sleep infinity >/dev/null 2>&1 || \
       echo "[Ralph][sidecar] Failed to restart $name" >&2
